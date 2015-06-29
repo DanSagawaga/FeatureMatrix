@@ -30,5 +30,6 @@ public class SequenceFileReader
 	} finally {
 		IOUtils.closeStream(reader);
 		}		
+	// hi
 	}
 }
