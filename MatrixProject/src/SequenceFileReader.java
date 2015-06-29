@@ -9,6 +9,7 @@ import org.apache.hadoop.io.SequenceFile.Reader;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.util.ReflectionUtils;
 
+
 public class SequenceFileReader
 {		
   public static void main(String[] args) throws IOException {
