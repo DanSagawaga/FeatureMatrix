@@ -23,6 +23,10 @@ public class FeatureSet {
 	public boolean contains(String feature) {
 		return features_.contains(feature);
 	}
+	
+	public String toString(){
+		return features_.toString();
+	}
 
 	@SuppressWarnings("deprecation")
 	public String xml() {
@@ -58,5 +62,7 @@ public class FeatureSet {
 		}
 		return fs;
 	}
+
+	
 }
 
