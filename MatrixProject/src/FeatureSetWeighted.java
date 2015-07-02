@@ -47,6 +47,32 @@ public class FeatureSetWeighted {
 		xmlstr.append("</").append(FeatureSet.XML_TAG_FEATURE_SET_HEADER).append(">\n");
 		return xmlstr.toString();
 	}
+	public FeatureSetWeighted(){
+		
+	}
+	public FeatureSetWeighted (String xmlString) {
+		try {
+			Document doc = new SAXBuilder().build(new StringReader(xmlString));
+			if (doc!=null) {
+				for (Element child : doc.getRootElement().getChildren()) {
+					if (child.getName().equalsIgnoreCase(FeatureSet.XML_TAG_FEATURE)) {
+						add(child.getAttribute(FeatureSet.XML_TAG_FEATURE_NAME).getValue(),
+								Double.parseDouble(child.getAttribute(XML_TAG_FEATURE_WEIGHT).getValue()));
+					}
+				}
+			}
+		} 
+		catch (JDOMException jdome) {
+			System.err.println("JDOMException " + jdome.getMessage());
+		} 
+		catch (IOException ioe) {
+			System.err.println("IOException " + ioe.getMessage());
+		}
+	}
+}
+/*
+
+
 
 	public static FeatureSetWeighted createFromXmlString(String xmlString) {
 		FeatureSetWeighted fs = new FeatureSetWeighted();
@@ -69,4 +95,11 @@ public class FeatureSetWeighted {
 		}
 		return fs;
 	}
-}
+
+
+
+
+
+
+
+*/

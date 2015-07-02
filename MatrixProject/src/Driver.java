@@ -3,46 +3,61 @@ import java.util.*;
 
 
 
+
 public class Driver {
 
-	static int numOfFeatures = 0;
-	static int totalFeaturesInDocs = 0;
-	static int totalDocswithFeat = 0;
-	static int totalDocs= 0;
-	static HashMap<String, Integer> featIndex = new HashMap<String, Integer>();
+	static float numOfFeatures = 0;
+	static float totalRawFeaturesInDocs = 0;
+	static float totalDocsByFeat = 0;
+	static float totalDocs= 0;
+	static float idf = 0;
+	static String feature = "";
+	
+	static int tempDocID = 0;
+
+	static HashMap<Integer, Float> featIndex = new HashMap<Integer, Float>();
 
 
 	public static void main (String args[]) throws IOException{
 		
-		BufferedReader featReader = readDataFile("/home/cloudera/Desktop/2-100/feature-sets/ne_all/dictionary/Part-00000.txt");
-		String curLine = "";
-		Scanner scanner; 
+		totalDocs = (float)getTotalDocNum("/Users/dansaganome/Desktop/2-100/class-memberships/ClassMemberships.txt");
+		System.out.println(totalDocs);
 		
+		BufferedReader featReader = readDataFile("/Users/dansaganome/Desktop/2-100/feature-sets/ne_all/docfreqs/DocFreqs.txt");
+		BufferedReader featReader2 = readDataFile("/Users/dansaganome/Desktop/2-100/feature-sets/ne_all/rawfreqs/part-00000.txt");
+
+		String curLine = "", curLine2 = "";
+		Scanner scanner; 
+		StringTokenizer tokenizer = null;
 		
 		// Reads dictionary to index features into a hash map
-		for(int k = 0; ((curLine = featReader.readLine())!= null); k++){
-			featIndex.put(curLine,k);			
+		for(int k = 0; ((curLine = featReader.readLine())!= null) && ((curLine2 = featReader2.readLine())!= null); k++){
+			tokenizer = new StringTokenizer(curLine,"\t");
+			if(tokenizer.hasMoreTokens())
+			feature = tokenizer.nextToken();
+			if(tokenizer.hasMoreTokens())
+			totalDocsByFeat = Integer.parseInt(tokenizer.nextToken());
+			
+			
+			tokenizer = new StringTokenizer(curLine2,"\t");	//gets the raw number of features in all documents
+			if(tokenizer.hasMoreTokens())
+			tokenizer.nextToken();
+			if(tokenizer.hasMoreTokens())
+			totalRawFeaturesInDocs = Integer.parseInt(tokenizer.nextToken());
+			//System.out.println(k + ": " + feature + "\t" + totalDocsByFeat + "\n");
+			idf = (float) Math.log10(totalDocs / (Float.MIN_VALUE + totalDocsByFeat)); 
+			featIndex.put(k,idf);			
 		}
 		numOfFeatures = featIndex.size();
 		//System.out.println(featIndex.size());
-		
-		
-		
-		//Reads ClassMembership seq file to get total number of Documents
-		featReader = readDataFile("/home/cloudera/Desktop/2-100/class-memberships/ClassMemberships.txt");
-		while((curLine = featReader.readLine())!= null){
-			totalDocs++;
-		}
-		System.out.println(totalDocs);
-		
+			
 		
 
-		featReader = readDataFile("/home/cloudera/Desktop/2-100/feature-sets/ne_all/docfeaturesets/DocFeatureSets.txt");
+		featReader = readDataFile("/Users/dansaganome/Desktop/2-100/feature-sets/ne_all/docfeaturesets-weighted/docfeaturesets-weighted.xml");
 		
-		int tempDocID = 0;
 		String partialXml = "";
 		String fullXml = "";
-		FeatureSetWeighted XmlReader = new FeatureSetWeighted();
+		FeatureSetWeighted XmlReader = new FeatureSetWeighted(); 
 		
 		for(int k = 0; ((curLine = featReader.readLine())!= null); k++){
 			scanner = new Scanner(curLine);
@@ -56,22 +71,30 @@ public class Driver {
 			}
 			else if(curLine.equals("</features>")){	//once the full xml string is set it is ready to process
 				fullXml = partialXml + curLine;
-				XmlReader = XmlReader.createFromXmlString(fullXml);
-				System.out.println(fullXml);
+			//	System.out.println(fullXml);
+				if(fullXml != null){
+				XmlReader = new FeatureSetWeighted(fullXml);
+				}
+		//		System.out.println(fullXml);
 			}
-		
-			//System.out.println(partialXml);
-	
-		//input = input + "\n" +curLine;
+		}			
 		}
-		//System.out.println(fullXml);
-		
 
-	//	FeatureSetWeighted setReader = new FeatureSetWeighted();
-	//	setReader = setReader.createFromXmlString(curLine);
-		//System.out.println(SetReader.toString());
 		
+public static int getTotalDocNum(String filePath){
+	//Reads ClassMembership seq file to get total number of Documents
+	BufferedReader featReader = readDataFile(filePath);
+	int counter = 0;
+	try{
+	while((featReader.readLine()!= null)){
+		counter++;
 	}
+	return counter;
+	} catch(IOException e){
+		System.err.println("Error counting total documents: " + e.getMessage());
+		return -1;
+	}
+}
 	
 	public static BufferedReader readDataFile(String filename) {
 		BufferedReader inputReader = null;
@@ -84,6 +107,10 @@ public class Driver {
 		return inputReader;
 	}
 }
+
+
+
+
 
 /*
  * 
