@@ -2,10 +2,16 @@ import java.io.*;
 import java.util.*;
 
 import org.jdom2.*;
+//import org.w3c.dom.Document;
 import org.jdom2.input.SAXBuilder;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
-
+import org.xml.sax.InputSource;
+import javax.xml.parsers.ParserConfigurationException;
+import org.w3c.dom.NodeList;
+import java.io.StringReader;
+import javax.xml.xpath.*;
+import org.xml.sax.InputSource;
 
 
 
@@ -22,85 +28,27 @@ public class Driver {
 	
 	static int tempDocID = 0;
 	
-	static HashMap<String, String> DocFreqHash = new HashMap<String, String>(1000,990); // <String feature, String index + docFreq>
+	static HashMap<String, String> feature_Index_docFreq = new HashMap<String, String>(1000,990); // <String feature, String index + docFreq>
 	static HashMap<String, Float> FeatureSetWeightedHash = new HashMap<String, Float>(1000,990); // <String Doc ID + feature Index, weight>
 	static HashMap<Integer, Float> MaxFeatureWeight = new HashMap<Integer, Float>(1000,990); // <String Doc ID + feature Index, weight>
 
 
 
-	public static void main (String args[]) throws IOException{
+	public static void main (String args[]) throws Exception{
 
 		/*
 		 * PHASE 1 read 3 sequence files to get TotalDocs, TotalRawFreqs, TotalDocFreq, and index features 
 		 */
 		//totalDocs = (float)getTotalDocNum("/Users/dansaganome/Desktop/2-100/class-memberships/ClassMemberships.txt");
-	//	System.out.println(totalDocs);
+		//	System.out.println(totalDocs);
 
-		ReadDocFreq("/home/cloudera/Desktop/2-100/feature-sets/ne_all/docfreqs/DocFreqs.txt");
+		readDocFreq("/home/cloudera/Desktop/2-100/feature-sets/ne_all/docfreqs/DocFreqs.txt");
+	
+		readDocFeatureSetsWeighted("/home/cloudera/Desktop/2-100/feature-sets/ne_all/docfeaturesets-weighted/docfeaturesets-weighted.xml");
 		
-		BufferedReader featReader = readDataFile("/home/cloudera/Desktop/2-100/feature-sets/ne_all/docfeaturesets-weighted/docfeaturesets-weighted.xml");
 		
-		Scanner scanner;
-		StringTokenizer tokenizer; 
-		SAXBuilder saxBuilder = new SAXBuilder();
-		String curLine = "";
-		float maxWeight = 0;
-
-		
-		for(int k = 0; ((curLine = featReader.readLine())!= null) && k < 18 ; k++){
-			scanner = new Scanner(curLine);
-			
-			if(scanner.hasNextInt()){		//if the line has an int, then it is parsed as Doc ID and the rest is appened to the xml string
-				tempDocID = scanner.nextInt();
-				maxWeight = 0;
-				totalDocs++;
-			}
-			else if(!curLine.equals("</features>") && !curLine.equals("")){	
-				
-				try {
-					curLine = "<features>" + curLine + "<features/>";
-				    DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-			         DocumentBuilder builder = factory.newDocumentBuilder();
-			         Document doc = builder.parse(curLine);
-
-
-					
-					
-				    System.out.println(doc.getAttribute(FeatureSet.XML_TAG_FEATURE_NAME).getValue());
-				} catch (JDOMException e) {
-				    // handle JDOMException\
-				}
-				
-				tokenizer = new StringTokenizer(curLine,"\"");
-				tokenizer.nextToken();
-				feature = tokenizer.nextToken();							//Gets Feature Name
-				tokenizer.nextToken();
-				tempFeatureWeight = Float.parseFloat(tokenizer.nextToken());//Gets Feature Weight
-				if(tempFeatureWeight > maxWeight)
-					maxWeight = tempFeatureWeight;
-				
-				/*
-				 * Hashes values into <String Doc ID + feature Index, weight>
-				 */
-				
-			//	scanner = new Scanner(DocFreqHash.get(feature));
-				
-			//	System.out.println(feature +"  " + DocFreqHash.get(feature));
-			//	int temp = scanner.nextInt();
-			//	FeatureSetWeightedHash.put((tempDocID + " " + temp), tempFeatureWeight);
-			}
-			else if(curLine.equals("</features>")){
-			}
-			/*
-			 * Hashes the Document's feature' max weight;
-			 */
-				MaxFeatureWeight.put(tempDocID,maxWeight);
-			}
 		}
-		
-
-
-		
+				
 	public static int getTotalDocNum(String filePath){
 		//Reads ClassMembership seq file to get total number of Documents
 		BufferedReader featReader = readDataFile(filePath);
@@ -116,12 +64,12 @@ public class Driver {
 		}
 	}
 
-	public static void ReadDocFreq(String filePath){
-		/*
-		 * Reads the Doc Frequency file first and the Doc frequency 
-		 * Puts values into DocFreq Hash
-		 *  HashMap <feature, (index + doqFreq)>
-		 */
+	/*
+	 * Reads the Doc Frequency file first and the Doc frequency 
+	 * Puts values into DocFreq Hash
+	 *  HashMap <feature, (index + doqFreq)>
+	 */
+	public static void readDocFreq(String filePath){
 		
 		BufferedReader featReader = readDataFile(filePath);
 		String curLine = "";
@@ -129,19 +77,19 @@ public class Driver {
 		
 		
 		try{
-		for(int k = 0; (((curLine = featReader.readLine())!= null) && (!curLine.equals(""))); k++){
+		for(int k = 0; (((curLine = featReader.readLine())!= null) && (!curLine.equals(" "))); k++){
 
 			tokenizer = new StringTokenizer(curLine,"\t");
 			if(tokenizer.hasMoreTokens())
 			feature = tokenizer.nextToken();
 			else{
-				System.out.println("DocFreq Line " + k + " : bad feature input, replaced with a \" \" instead");
+				System.out.println("Bad DocFreq Feature " + (k+1) + " " + feature);
 				feature = "";
 			}
 			if(tokenizer.hasMoreTokens())
 				totalDocsWithFeature = Integer.parseInt(tokenizer.nextToken());
 			else{
-				System.out.println("Line " + k + " : bad number input, replaced with a 0 instead");
+				System.out.println("Bad DocFreq Feeature: " + (k+ 1) + "\n" + feature);
 				totalDocsWithFeature = 0;
 			}
 			//System.out.println(k + ": " + feature + "\t" + totalDocsByFeat + "\n");
@@ -149,15 +97,65 @@ public class Driver {
 			 * Hashes the values into a <String feature, String Feature Index + DocFreq> 
 			 */
 			//System.out.println(k +" " + feature + " "  + " " + totalDocsWithFeature);
-			DocFreqHash.put(feature,(k + " " + totalDocsWithFeature));
+			feature_Index_docFreq.put(feature,(k + "\t" + totalDocsWithFeature));
 		}
 		}catch(Exception e){
 			System.out.println("ERROR: Reading in totalDocs files: " + e.getMessage());
 		}
-		numOfFeatures = DocFreqHash.size();
+		numOfFeatures = feature_Index_docFreq.size();
+	}
+	/*
+	 * Method reads in xml file line by line retrieving the the Document ID, it's features and their respective weights
+	 * A matrix representation is made using the Doc ID, feature column Index, and weight as value 
+	 * The total amount of Documents is calculated as well
+	 * 
+	 */
+	public static void readDocFeatureSetsWeighted(String filePath) throws IOException{
+		
+		BufferedReader featReader = readDataFile(filePath);
+		Scanner scanner;
+		StringTokenizer tokenizer; 
+		FeatureSetWeighted Xmlparser = new FeatureSetWeighted();
+		String curLine = "";
+		float maxWeight = 0;
+
+		for(int k = 0; ((curLine = featReader.readLine())!= null); k++){ //loop that runs through file
+			
+			scanner = new Scanner(curLine);	
+			if(scanner.hasNextInt()){			//if the line has an integer then it is a Document ID and the rest is discarded
+				tempDocID = scanner.nextInt();	//stoes Document ID in local integer
+				maxWeight = 0;
+				totalDocs++;					//counts the documents in file
+			}
+			else if(!curLine.equals("</features>") && !curLine.equals("")){	//any line that does not have the closing tag or empty is a feature line
+				
+				curLine = " <features>" + curLine +  "</features>"; //adds opening and closing tags to each line so they can be parsed with FeatureSetWeighted Class
+				curLine = Xmlparser.parseXML(curLine); //calls FeatureWeight object to parse XML format to string consisting of the feature and weight 
+					
+				tokenizer = new StringTokenizer(curLine,"\t");
+				feature = tokenizer.nextToken();							//Gets Feature Name
+				tempFeatureWeight = Float.parseFloat(tokenizer.nextToken());//Gets Feature Weight
+				
+				System.out.println(feature + "\t" + tempFeatureWeight);
+				if(tempFeatureWeight > maxWeight)
+					maxWeight = tempFeatureWeight;
+				
+				/*
+				 * Hashes values into <String Doc ID + feature Index, weight>
+				 */
+			
+				scanner = new Scanner(feature_Index_docFreq.get(feature));	//retrieves the column index of the feature
+				FeatureSetWeightedHash.put((tempDocID + " " + scanner.nextInt()), tempFeatureWeight); // places into matrix represenation of hash 
+			}
+			else if(curLine.equals("</features>")){
+			}
+			/*
+			 * Hashes the Document's feature' max weight;
+			 */
+				MaxFeatureWeight.put(tempDocID,maxWeight);
+			}		
 	}
 
-	
 	public static BufferedReader readDataFile(String filename) {
 		BufferedReader inputReader = null;
 		try {
@@ -170,10 +168,6 @@ public class Driver {
 	}
 }
 
-
-
-
-
 /*
  * 
  * File file = new File("/home/cloudera/Desktop/2-100/feature-sets/ne_all/dictionary/part-00000.txt");
@@ -184,8 +178,5 @@ public class Driver {
 	writer.println("The first line");
 	writer.println("The second line");
 	writer.close();
- * 
- * 
- * 
  * 
  */

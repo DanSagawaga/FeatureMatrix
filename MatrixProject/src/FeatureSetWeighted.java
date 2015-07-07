@@ -32,6 +32,9 @@ public class FeatureSetWeighted {
 	public double getWeight(String feature) {
 		return weightedFeatures_.get(feature);
 	}
+	public String toString(){
+		return weightedFeatures_.toString();
+	}
 	
 	@SuppressWarnings("deprecation")
 	public String xml() {
@@ -62,6 +65,7 @@ public class FeatureSetWeighted {
 				}
 			}
 		} 
+		
 		catch (JDOMException jdome) {
 			System.err.println("JDOMException " + jdome.getMessage());
 		} 
@@ -69,6 +73,32 @@ public class FeatureSetWeighted {
 			System.err.println("IOException " + ioe.getMessage());
 		}
 	}
+	public String parseXML(String xmlString){
+		String featureAndWeight = "";
+		try {
+			Document doc = new SAXBuilder().build(new StringReader(xmlString));
+			if (doc!=null) {
+				for (Element child : doc.getRootElement().getChildren()) {
+					if (child.getName().equalsIgnoreCase(FeatureSet.XML_TAG_FEATURE)) {
+						featureAndWeight = (child.getAttribute(FeatureSet.XML_TAG_FEATURE_NAME).getValue());
+							featureAndWeight += "\t" + Double.parseDouble(child.getAttribute(XML_TAG_FEATURE_WEIGHT).getValue());
+						
+					}
+				}
+			}
+			return featureAndWeight;
+		} 
+		
+		catch (JDOMException jdome) {
+			System.err.println("JDOMException " + jdome.getMessage());
+			return "no valid xml feature";
+		} 
+		catch (IOException ioe) {
+			System.err.println("IOException " + ioe.getMessage());
+			return "not a valid feature";
+		}
+	}
+
 }
 /*
 
