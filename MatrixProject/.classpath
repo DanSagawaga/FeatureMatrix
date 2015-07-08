@@ -3,13 +3,13 @@
 	<classpathentry kind="src" path="src"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/Hadoop 2.7"/>
-	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/Hbase"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/JDom"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/Lang"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/Apache Lang"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/JDom2"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/Weka3.7"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/Hbase"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/Hadoop Jars"/>
-	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/HBase"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/Hadoop"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
