@@ -344,6 +344,7 @@ public class HBaseHelper implements Closeable {
       if (fams != null) {
         for (String fam : fams) {
           for (String qual : quals) {
+ 
             get.addColumn(Bytes.toBytes(fam), Bytes.toBytes(qual));
           }
         }

@@ -11,31 +11,31 @@ import org.jdom2.input.SAXBuilder;
 public class FeatureSetWeighted {
 	public static final String XML_TAG_FEATURE_WEIGHT = "weight";
 	private TreeMap<String,Double> weightedFeatures_ = new TreeMap<String,Double>();
-	
+
 	public void add(String feature, double weight) {
 		if (feature==null) return;
 		if (feature.isEmpty()) return;
 		if (weightedFeatures_.containsKey(feature)) weightedFeatures_.put(feature, weightedFeatures_.get(feature)+weight);
 		else weightedFeatures_.put(feature, weight);
 	}
-	
+
 	public void replace(String feature, double weight) {
 		if (feature==null) return;
 		if (feature.isEmpty()) return;
 		weightedFeatures_.put(feature, weight);
 	}
-	
+
 	public boolean contains(String feature) {
 		return weightedFeatures_.containsKey(feature);
 	}
-	
+
 	public double getWeight(String feature) {
 		return weightedFeatures_.get(feature);
 	}
 	public String toString(){
 		return weightedFeatures_.toString();
 	}
-	
+
 	@SuppressWarnings("deprecation")
 	public String xml() {
 		StringBuilder xmlstr = new StringBuilder("");
@@ -51,7 +51,7 @@ public class FeatureSetWeighted {
 		return xmlstr.toString();
 	}
 	public FeatureSetWeighted(){
-		
+
 	}
 	public FeatureSetWeighted (String xmlString) {
 		try {
@@ -65,7 +65,7 @@ public class FeatureSetWeighted {
 				}
 			}
 		} 
-		
+
 		catch (JDOMException jdome) {
 			System.err.println("JDOMException " + jdome.getMessage());
 		} 
@@ -81,14 +81,14 @@ public class FeatureSetWeighted {
 				for (Element child : doc.getRootElement().getChildren()) {
 					if (child.getName().equalsIgnoreCase(FeatureSet.XML_TAG_FEATURE)) {
 						featureAndWeight = (child.getAttribute(FeatureSet.XML_TAG_FEATURE_NAME).getValue());
-							featureAndWeight += "\t" + Double.parseDouble(child.getAttribute(XML_TAG_FEATURE_WEIGHT).getValue());
-						
+						featureAndWeight += "\t" + Double.parseDouble(child.getAttribute(XML_TAG_FEATURE_WEIGHT).getValue());
+
 					}
 				}
 			}
 			return featureAndWeight;
 		} 
-		
+
 		catch (JDOMException jdome) {
 			System.err.println("JDOMException " + jdome.getMessage());
 			return "no valid xml feature";
@@ -132,4 +132,4 @@ public class FeatureSetWeighted {
 
 
 
-*/
+ */
