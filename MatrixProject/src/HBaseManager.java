@@ -39,6 +39,13 @@ public class HBaseManager {
 		      System.out.println("Row Key: " + Bytes.toInt(result.getRow()));	 
 		scanner.close();
 	}
+	public boolean recordExists (int rowPar, String familyNamePar, String columnPar)throws IOException{
+		Get get = new Get(Bytes.toBytes(rowPar));
+		get.addFamily(Bytes.toBytes(familyNamePar));	   
+		Result result1 = htable.get(get);
+		if(result1.getvalue)
+		
+	}
 	
 	public String[] getColumns(int rowPar, String ColumnFamily) throws IOException	{
 		Get get = new Get(Bytes.toBytes(rowPar));
