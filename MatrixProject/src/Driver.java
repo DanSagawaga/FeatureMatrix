@@ -36,11 +36,16 @@ public class Driver {
 
 		HBaseAdmin= new HBaseManager();
 		HBaseAdmin.pickTable("DanTestTable");
+		//HBaseAdmin.createTable("DanTestTable","FeatureFamily");
 		HBaseAdmin.listTables();
-		System.out.println(HBaseAdmin.getFamilyNames());
+		HBaseAdmin.getRows("FeatureFamily");
+
 		
-		//readDocFreq("/home/cloudera/Desktop/2-100/feature-sets/ne_all/docfreqs/DocFreqs.txt");
-		//readDocFeatureSetsWeighted("/home/cloudera/Desktop/2-100/feature-sets/ne_all/docfeaturesets-weighted/docfeaturesets-weighted.xml");
+		//	public  String getRecord(String rowPar, String familyNamePar, String columnPar)throws IOException{
+	//	System.out.println(HBaseAdmin.getFamilyNames());
+		
+	//	readDocFreq("/home/cloudera/Desktop/2-100/feature-sets/ne_all/docfreqs/DocFreqs.txt");
+	//	readDocFeatureSetsWeighted("/home/cloudera/Desktop/2-100/feature-sets/ne_all/docfeaturesets-weighted/docfeaturesets-weighted.xml");
 
 
 	}
@@ -142,9 +147,9 @@ public class Driver {
 
 				scanner = new Scanner(feature_Index_docFreq.get(feature));	//retrieves the column index of the feature
 				FeatureSetWeightedHash.put((tempDocID + " " + scanner.nextInt()), tempFeatureWeight); // places into matrix represenation of hash 
-				String stringDocID = (""+tempDocID);
+				//(tempDocID,"FeatureFamily",feature, tempFeatureWeight);
 				
-				HBaseAdmin.putRecord(stringDocID,"FeatureFamily",feature);
+				HBaseAdmin.putRecord(tempDocID, "FeatureFamily", feature, tempFeatureWeight);
 			}
 			else if(curLine.equals("</features>")){
 			}

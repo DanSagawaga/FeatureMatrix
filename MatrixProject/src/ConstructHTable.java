@@ -75,7 +75,7 @@ public class ConstructHTable {
 		scanner.close();
 	}
 
-	public static String getRecord(String rowPar, String familyNamePar, String columnPar)throws IOException{
+	public static String getRecord(int rowPar, String familyNamePar, String columnPar)throws IOException{
 		Get get = new Get(Bytes.toBytes(rowPar));
 		get.addFamily(Bytes.toBytes(familyNamePar));	   
 		Result result1 = htable.get(get);  	  
@@ -90,6 +90,15 @@ public class ConstructHTable {
 		System.out.println("Addition to Table: "+ htable.getName() + ", Added Row: "+ rowPar + ", Column: "+columnPar+ ", Value: " + valuePar);
 	}
 
+	public static void putRecord(int rowPar, String familyPar, String columnPar, float valuePar) throws IOException{
+		p = new Put(Bytes.toBytes(rowPar));
+		// accepts column family name, qualifier/row name ,value
+		p.addColumn(Bytes.toBytes(familyPar),Bytes.toBytes(columnPar), Bytes.toBytes(valuePar));
+		htable.put(p);
+		htable.flushCommits();
+		System.out.println("Addition to Table: "+ htable.getName() + ", Added Row: "+ rowPar + ", Column: "+columnPar+ ", Value: " + valuePar);
+	}
+	
 	public static void deleteTable(String tableNamePar ) throws IOException{
 		if(admin.tableExists(tableNamePar)){
 			disableTable(tableNamePar);
