@@ -10,6 +10,9 @@ import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.filter.*;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.filter.ByteArrayComparable;
+
+
 
 public class HBaseManager {
 
@@ -19,9 +22,9 @@ public class HBaseManager {
 	private static HTable htable = null;
 	private static Put p = null;
 	Filter filter = new QualifierFilter(CompareFilter.CompareOp.LESS_OR_EQUAL,
-		      new BinaryComparator(Bytes.toBytes("ColumnTest1")));
-	
-	
+			new BinaryComparator(Bytes.toBytes("ColumnTest1")));
+
+
 	@SuppressWarnings("deprecation")
 
 	public HBaseManager()throws IOException{
@@ -31,42 +34,46 @@ public class HBaseManager {
 		admin = (HBaseAdmin)connection.getAdmin();
 	}
 
+
 	public void getRows(String ColumnFamily)throws IOException{
 		Scan scan = new Scan();
 		scan.setFilter(new FirstKeyOnlyFilter());
 		ResultScanner scanner = htable.getScanner(scan);
 		for (Result result : scanner)
-		      System.out.println("Row Key: " + Bytes.toInt(result.getRow()));	 
+			System.out.println("Row Key: " + Bytes.toInt(result.getRow()));	 
 		scanner.close();
 	}
-	public boolean recordExists (int rowPar, String familyNamePar, String columnPar)throws IOException{
+	/*	public boolean recordExists (int rowPar, String familyNamePar, String columnPar)throws IOException{
 		Get get = new Get(Bytes.toBytes(rowPar));
 		get.addFamily(Bytes.toBytes(familyNamePar));	   
 		Result result1 = htable.get(get);
-		if(result1.getvalue)
-		
+		return ( (result1.getValue(Bytes.toBytes(familyNamePar), Bytes.toBytes(columnPar))) != null);
+
+
 	}
-	
+	 */
 	public String[] getColumns(int rowPar, String ColumnFamily) throws IOException	{
 		Get get = new Get(Bytes.toBytes(rowPar));
 		//get.addFamily(Bytes.toBytes());	   
 		Result r = htable.get(get); 
 
-	      NavigableMap<byte[], byte[]> familyMap = r.getFamilyMap(Bytes.toBytes(ColumnFamily));
-	      String[] Quantifers = new String[familyMap.size()];
+		NavigableMap<byte[], byte[]> familyMap = r.getFamilyMap(Bytes.toBytes(ColumnFamily));
+		String[] Quantifers = new String[familyMap.size()];
 
-	      int counter = 0;
-	      for(byte[] bQunitifer : familyMap.keySet()) {
-	          Quantifers[counter++] = Bytes.toString(bQunitifer);
-	      }
+		int counter = 0;
+		for(byte[] bQunitifer : familyMap.keySet()) {
+			Quantifers[counter++] = Bytes.toString(bQunitifer);
+		}
 
-	      return Quantifers;
+		return Quantifers;
 	}
+	
 	public void pickTable(String tableNamePar)throws IOException{
 		if(admin.tableExists(tableNamePar))
-		htable = new HTable(conf, TableName.valueOf(tableNamePar));
+			htable = new HTable(conf, TableName.valueOf(tableNamePar));
 		else System.out.println("Table does not exist");
 	}
+
 	public  void createTable(String tableNamePar, String familyNamePar)throws IOException{
 		//instantiates table descriptor class
 		HTableDescriptor tableDescriptor = new HTableDescriptor(TableName.valueOf(tableNamePar));	    //creating column family descriptor
@@ -76,11 +83,12 @@ public class HBaseManager {
 		if(!admin.tableExists(tableNamePar)){
 			admin.createTable(tableDescriptor);
 			System.out.println("Created table: " + tableNamePar + ", With Family: " + familyNamePar);  
-      }
+		}
 		else{
 			System.out.println("Table: " + tableNamePar + " already exsits.");
 		}
 	}
+	
 	public  void deleteTable(String tableNamePar ) throws IOException{
 		if(admin.tableExists(tableNamePar)){
 			disableTable(tableNamePar);
@@ -88,10 +96,12 @@ public class HBaseManager {
 			System.out.println("Table: " + tableNamePar + " deleted");
 		}
 	}
+	
 	public  void switchTable(String tableName)throws IOException{
-		
+
 		htable = new HTable(conf, TableName.valueOf(tableName));
 	}
+
 	public  void disableTable(String tableNamePar)throws IOException{
 
 		boolean b = admin.isTableDisabled(tableNamePar);
@@ -104,6 +114,7 @@ public class HBaseManager {
 		}
 
 	}
+	
 	public  void listTables()throws IOException{
 		HTableDescriptor[] tableDescriptor = admin.listTables();
 		// printing all the table names.
@@ -111,8 +122,18 @@ public class HBaseManager {
 			System.out.println(tableDescriptor[i].getNameAsString());
 		}
 	}
- 
-	public void putRecord(int rowPar, String familyPar, String columnPar, float valuePar) throws IOException{
+
+	public void putRecord(int rowPar, String familyPar, String columnPar, int valuePar) throws IOException{
+		String rowParStr = ""+rowPar;
+		p = new Put(Bytes.toBytes(rowParStr));
+		// accepts column family name, qualifier/row name ,value
+		p.addColumn(Bytes.toBytes(familyPar),Bytes.toBytes(columnPar), Bytes.toBytes(valuePar));
+		htable.put(p);
+		htable.flushCommits();
+		System.out.println("Addition to Table: "+ htable.getName() + ", Added Row: "+ rowPar + ", Column: "+columnPar+ ", Value: " + valuePar);
+	}
+
+	public void putRecord(String rowPar, String familyPar, String columnPar, int valuePar) throws IOException{
 		p = new Put(Bytes.toBytes(rowPar));
 		// accepts column family name, qualifier/row name ,value
 		p.addColumn(Bytes.toBytes(familyPar),Bytes.toBytes(columnPar), Bytes.toBytes(valuePar));
@@ -120,12 +141,14 @@ public class HBaseManager {
 		htable.flushCommits();
 		System.out.println("Addition to Table: "+ htable.getName() + ", Added Row: "+ rowPar + ", Column: "+columnPar+ ", Value: " + valuePar);
 	}
-	public float getRecord(int rowPar, String familyNamePar, String columnPar)throws IOException{
+
+	public String getRecord(String rowPar, String familyNamePar, String columnPar)throws IOException{
 		Get get = new Get(Bytes.toBytes(rowPar));
 		get.addFamily(Bytes.toBytes(familyNamePar));	   
 		Result result1 = htable.get(get);  	  
-		return (Bytes.toFloat(result1.getValue(Bytes.toBytes(familyNamePar), Bytes.toBytes(columnPar))));
+		return (Bytes.toString(result1.getValue(Bytes.toBytes(familyNamePar), Bytes.toBytes(columnPar))));
 	}
+
 	public  void scanColumn(String familyNamePar, String columnPar )throws IOException{
 
 		Scan scan = new Scan();
@@ -139,7 +162,15 @@ public class HBaseManager {
 		}
 		scanner.close();
 	}
+
 	public String getFamilyNames()throws IOException{
 		return htable.getTableDescriptor().toStringCustomizedValues();
 	}
+
+	
+	public Configuration getConfiguration() {
+		// TODO Auto-generated method stub
+		return conf;
+	}
+
 }

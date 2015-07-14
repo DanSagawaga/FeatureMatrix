@@ -1,61 +1,68 @@
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.util.StringTokenizer;
 
+import org.apache.hadoop.hbase.client.Result;
+import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
+import org.apache.hadoop.hbase.mapreduce.TableMapper;
+import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.io.IntWritable;
-import org.apache.hadoop.io.LongWritable;
-import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.hbase.client.Mutation;
+import org.apache.hadoop.hbase.KeyValue;
+import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.hadoop.hbase.client.Put;
 
-/* 
- * To define a map function for your MapReduce job, subclass 
- * the Mapper class and override the map method.
- * The class definition requires four parameters: 
- *   The data type of the input key
- *   The data type of the input value
- *   The data type of the output key (which is the input key type 
- *   for the reducer)
- *   The data type of the output value (which is the input value 
- *   type for the reducer)
- */
 
-public class HBaseMapper extends Mapper<LongWritable, Text, Text, IntWritable> {
 
-  /*
-   * The map method runs once for each line of text in the input file.
-   * The method receives a key of type LongWritable, a value of type
-   * Text, and a Context object.
-   */
-  @Override
-  public void map(LongWritable key, Text value, Context context)
-      throws IOException, InterruptedException {
-	  
-	    HBaseManager HBaseAdmin = null;
-	    HBaseAdmin= new HBaseManager();
-		HBaseAdmin.pickTable("DanTestTable");
-        String curLine = value.toString();
 
+
+public class HBaseMapper  extends Mapper<LongWritable, Text, ImmutableBytesWritable, Mutation> { // co ImportFromFile-2-Mapper Define the mapper class, extending the provided Hadoop class.
+
+	public enum Counters { LINES }
+
+    // ^^ ImportFromFile
+    /**
+     * Prepares the column family and qualifier.
+     *
+     * @param context The task context.
+     * @throws IOException When an operation fails - not possible here.
+     * @throws InterruptedException When the task is aborted.
+     */
+    // vv ImportFromFile
+    @Override
+    protected void setup(Context context) throws IOException, InterruptedException {
+
+    }
     
-	StringTokenizer tokenizer = null;
-	String feature = "";
-
-
-	try{
-			tokenizer = new StringTokenizer(curLine,"\t");
+    @Override
+    public void map(LongWritable offset, Text line, Context context) // co ImportFromFile-3-Map The map() function transforms the key/value provided by the InputFormat to what is needed by the OutputFormat.
+    throws IOException {
+      try {
+          String lineString = line.toString(), feature = "", totalDocsWithFeature = "";
+    	  
+          StringTokenizer tokenizer = new StringTokenizer(lineString,"\t");
 			if(tokenizer.hasMoreTokens())
 				feature = tokenizer.nextToken();
 			else{
-				System.out.println("Bad DocFreq Feature "  + feature);
+				System.out.println("Bad DocFreq Feature " + feature);
 				feature = "";
 			}
+			if(tokenizer.hasMoreTokens())
+				totalDocsWithFeature = tokenizer.nextToken();
+			else{
+				System.out.println("Bad DocFreq Feeature: "  + "\n" + feature);
+				totalDocsWithFeature = "";
+			}
 			
-	        context.write(new Text(feature), new IntWritable(1));
-
-	}catch(Exception e){
-		System.out.println("ERROR: Reading in totalDocs files: " + e.getMessage());
-	}
-    
-    
-    
+	       Put put = new Put(Bytes.toBytes("IndexRowTest1"));
+	       put.addColumn(Bytes.toBytes("FeatureFamily"), Bytes.toBytes(feature), Bytes.toBytes(totalDocsWithFeature)); // co ImportFromFile-5-Put Store the original data in a column in the given table.
+	       context.write(new ImmutableBytesWritable(Bytes.toBytes("IndexRowTest1")), put);
+           context.getCounter(Counters.LINES).increment(1);
+  
+      } catch (Exception e) {
+        e.printStackTrace();
+      }
+    }
   }
-}

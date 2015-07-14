@@ -35,10 +35,12 @@ public class Driver {
 	public static void main (String args[]) throws Exception{
 
 		HBaseAdmin= new HBaseManager();
+		//HBaseAdmin.deleteTable("DanTestTable");
 		HBaseAdmin.pickTable("DanTestTable");
 		//HBaseAdmin.createTable("DanTestTable","FeatureFamily");
-		HBaseAdmin.listTables();
-		HBaseAdmin.getRows("FeatureFamily");
+	//	HBaseAdmin.listTables();
+		//HBaseAdmin.getRows("FeatureFamily");
+		System.out.println(HBaseAdmin.getRecord("IndexRowTest1", "FeatureFamily","10"));
 
 		
 		//	public  String getRecord(String rowPar, String familyNamePar, String columnPar)throws IOException{
@@ -149,7 +151,7 @@ public class Driver {
 				FeatureSetWeightedHash.put((tempDocID + " " + scanner.nextInt()), tempFeatureWeight); // places into matrix represenation of hash 
 				//(tempDocID,"FeatureFamily",feature, tempFeatureWeight);
 				
-				HBaseAdmin.putRecord(tempDocID, "FeatureFamily", feature, tempFeatureWeight);
+			//	HBaseAdmin.putRecord(tempDocID, "FeatureFamily", feature, tempFeatureWeight);
 			}
 			else if(curLine.equals("</features>")){
 			}
