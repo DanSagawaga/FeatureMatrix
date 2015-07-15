@@ -6,7 +6,12 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.mapreduce.TableOutputFormat;
 import org.apache.hadoop.hbase.HBaseConfiguration;
-
+import org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat;
+import org.apache.hadoop.hbase.client.Put;
+import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
+import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.client.Result;
+import org.apache.hadoop.mapred.SequenceFileAsTextInputFormat;
 
 
 public class HBaseRunner  {
@@ -19,22 +24,27 @@ try{
     }
     
     Configuration conf = HBaseConfiguration.create();
+    conf.set("textinputformat.record.delimiter","</features>");
 	//admin.pickTable("DanTestTable");
     //admin.putRecord("IndexRowTest1","FeatureFamily", "EmptyFeature", 0);
 
    // Configuration conf = admin.getConfiguration();
 
     
-    Job job = new Job(conf,"HBaseRunner");   
-    
+    Job job = new Job(conf,"HBaseRunner");
+    job.setInputFormatClass(SequenceFileInputFormat.class);
     job.setJarByClass(HBaseRunner.class);
     job.setJobName("HBaseRunner Job");
-    job.setMapperClass(HBaseMapper.class);
+ // job.setMapperClass(HBaseMapper.class);
+    job.setMapperClass(HBaseMapperFeatureSet.class);
     job.setOutputFormatClass(TableOutputFormat.class);
     job.getConfiguration().set(TableOutputFormat.OUTPUT_TABLE, "DanTestTable");
     job.setOutputKeyClass(ImmutableBytesWritable.class);
     job.setOutputValueClass(Writable.class);
+ //   job.setMapOutputValueClass(Put.class);
     job.setNumReduceTasks(0); 
+    
+    
 
     FileInputFormat.setInputPaths(job, new Path(args[0]));   
     

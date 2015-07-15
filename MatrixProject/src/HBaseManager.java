@@ -52,7 +52,7 @@ public class HBaseManager {
 
 	}
 	 */
-	public String[] getColumns(int rowPar, String ColumnFamily) throws IOException	{
+	public String[] getColumns(String rowPar, String ColumnFamily) throws IOException	{
 		Get get = new Get(Bytes.toBytes(rowPar));
 		//get.addFamily(Bytes.toBytes());	   
 		Result r = htable.get(get); 

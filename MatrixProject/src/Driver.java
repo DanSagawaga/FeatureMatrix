@@ -27,7 +27,7 @@ public class Driver {
 	static HBaseManager HBaseAdmin = null;
 
 	static HashMap<String, String> feature_Index_docFreq = new HashMap<String, String>(1000,990); // <String feature, String index + docFreq>
-	static HashMap<String, Float> FeatureSetWeightedHash = new HashMap<String, Float>(1000,990); // <String Doc ID + feature Index, weight>
+	static HashMap<Integer, String> FeatureSetWeightedHash = new HashMap<Integer, String>(); // <String Doc ID + feature Index, weight>
 	static HashMap<Integer, Float> MaxFeatureWeight = new HashMap<Integer, Float>(1000,990); // <String Doc ID + feature Index, weight>
 
 
@@ -39,17 +39,27 @@ public class Driver {
 		HBaseAdmin.pickTable("DanTestTable");
 		//HBaseAdmin.createTable("DanTestTable","FeatureFamily");
 	//	HBaseAdmin.listTables();
-		//HBaseAdmin.getRows("FeatureFamily");
-		System.out.println(HBaseAdmin.getRecord("IndexRowTest1", "FeatureFamily","10"));
-
+	//	System.out.println(Arrays.toString(HBaseAdmin.getColumns("IndexRowTest1","FeatureFamily")));
+		//System.out.println(HBaseAdmin.getRecord("IndexRowTest1", "FeatureFamily","10"));
 		
 		//	public  String getRecord(String rowPar, String familyNamePar, String columnPar)throws IOException{
 	//	System.out.println(HBaseAdmin.getFamilyNames());
 		
 	//	readDocFreq("/home/cloudera/Desktop/2-100/feature-sets/ne_all/docfreqs/DocFreqs.txt");
 	//	readDocFeatureSetsWeighted("/home/cloudera/Desktop/2-100/feature-sets/ne_all/docfeaturesets-weighted/docfeaturesets-weighted.xml");
+		String[] allFeatures = HBaseAdmin.getColumns("IndexRowTest1","FeatureFamily");
 
+		System.out.println(HBaseAdmin.getRecord("IndexRowTest1","FeatureFamily",allFeatures[0]));
+		
+/*		for(int k = 0; k < allFeatures.length; k++){
+			FeatureSetWeightedHash.put(Integer.parseInt(HBaseAdmin.getRecord("IndexRowTest1","FeatureFamily",allFeatures[k])), allFeatures[k]);
+		}
 
+		for(int k = 1; k < allFeatures.length; k++){
+			System.out.println(k + " " + FeatureSetWeightedHash.get(k) + "\n");
+		}
+		
+*/
 	}
 
 	public static int getTotalDocNum(String filePath){
@@ -148,7 +158,7 @@ public class Driver {
 				 */
 
 				scanner = new Scanner(feature_Index_docFreq.get(feature));	//retrieves the column index of the feature
-				FeatureSetWeightedHash.put((tempDocID + " " + scanner.nextInt()), tempFeatureWeight); // places into matrix represenation of hash 
+		//		FeatureSetWeightedHash.put((tempDocID + " " + scanner.nextInt()), tempFeatureWeight); // places into matrix represenation of hash 
 				//(tempDocID,"FeatureFamily",feature, tempFeatureWeight);
 				
 			//	HBaseAdmin.putRecord(tempDocID, "FeatureFamily", feature, tempFeatureWeight);

@@ -47,20 +47,26 @@ public class HBaseMapper  extends Mapper<LongWritable, Text, ImmutableBytesWrita
 				feature = tokenizer.nextToken();
 			else{
 				System.out.println("Bad DocFreq Feature " + feature);
-				feature = "";
+				feature = null;
 			}
 			if(tokenizer.hasMoreTokens())
 				totalDocsWithFeature = tokenizer.nextToken();
 			else{
-				System.out.println("Bad DocFreq Feeature: "  + "\n" + feature);
-				totalDocsWithFeature = "";
+				System.out.println("Bad DocFreq Value: "  + "\n" + feature);
+				totalDocsWithFeature = null;
 			}
 			
+			if((feature != null) && (totalDocsWithFeature!= null)){
 	       Put put = new Put(Bytes.toBytes("IndexRowTest1"));
-	       put.addColumn(Bytes.toBytes("FeatureFamily"), Bytes.toBytes(feature), Bytes.toBytes(totalDocsWithFeature)); // co ImportFromFile-5-Put Store the original data in a column in the given table.
+	       context.getCounter(Counters.LINES).increment(1);
+           String counterIndex = "" + context.getCounter(Counters.LINES).getValue();
+           
+	       put.addColumn(Bytes.toBytes("FeatureFamily"), Bytes.toBytes(feature), Bytes.toBytes(counterIndex)); // co ImportFromFile-5-Put Store the original data in a column in the given table.
+	       System.out.println("#: " + counterIndex + " Feature: " + feature );
 	       context.write(new ImmutableBytesWritable(Bytes.toBytes("IndexRowTest1")), put);
-           context.getCounter(Counters.LINES).increment(1);
-  
+			}
+	       
+	       
       } catch (Exception e) {
         e.printStackTrace();
       }
