@@ -15,9 +15,6 @@ import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.hbase.client.Put;
 
 
-
-
-
 public class HBaseMapper  extends Mapper<LongWritable, Text, ImmutableBytesWritable, Mutation> { // co ImportFromFile-2-Mapper Define the mapper class, extending the provided Hadoop class.
 
 	public enum Counters { LINES }
