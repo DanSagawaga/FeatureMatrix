@@ -146,7 +146,7 @@ public class HBaseManager {
 		Get get = new Get(Bytes.toBytes(rowPar));
 		get.addFamily(Bytes.toBytes(familyNamePar));	   
 		Result result1 = htable.get(get);  	  
-		return (Bytes.toString(result1.getValue(Bytes.toBytes(familyNamePar), Bytes.toBytes(columnPar))));
+		return "" +(Bytes.toDouble(result1.getValue(Bytes.toBytes(familyNamePar), Bytes.toBytes(columnPar))));
 	}
 
 	public  void scanColumn(String familyNamePar, String columnPar )throws IOException{

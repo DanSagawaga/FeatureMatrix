@@ -1,17 +1,8 @@
 import java.io.*;
 import java.util.*;
-
-import org.jdom2.*;
+import java.lang.Math;
 //import org.w3c.dom.Document;
-import org.jdom2.input.SAXBuilder;
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import org.xml.sax.InputSource;
-import javax.xml.parsers.ParserConfigurationException;
-import org.w3c.dom.NodeList;
-import java.io.StringReader;
-import javax.xml.xpath.*;
-import org.xml.sax.InputSource;
+
 
 public class Driver {
 
@@ -35,21 +26,23 @@ public class Driver {
 	public static void main (String args[]) throws Exception{
 
 		HBaseAdmin= new HBaseManager();
-		//HBaseAdmin.deleteTable("DanTestTable");
 		HBaseAdmin.pickTable("DanTestTable");
-		//HBaseAdmin.createTable("DanTestTable","FeatureFamily");
-	//	HBaseAdmin.listTables();
-	//	System.out.println(Arrays.toString(HBaseAdmin.getColumns("IndexRowTest1","FeatureFamily")));
-		//System.out.println(HBaseAdmin.getRecord("IndexRowTest1", "FeatureFamily","10"));
+		//HBaseAdmin.deleteTable("DanTestTable");
+
+	//	HBaseAdmin.createTable("DanTestTable","FeatureFamily");
+		HBaseAdmin.listTables();
+		
+		//System.out.println(Arrays.toString(HBaseAdmin.getColumns("Index_Row","FeatureFamily")));
+		System.out.println(HBaseAdmin.getRecord("IDF_Row", "FeatureFamily","Joel Furr"));
 		
 		//	public  String getRecord(String rowPar, String familyNamePar, String columnPar)throws IOException{
 	//	System.out.println(HBaseAdmin.getFamilyNames());
 		
 	//	readDocFreq("/home/cloudera/Desktop/2-100/feature-sets/ne_all/docfreqs/DocFreqs.txt");
 	//	readDocFeatureSetsWeighted("/home/cloudera/Desktop/2-100/feature-sets/ne_all/docfeaturesets-weighted/docfeaturesets-weighted.xml");
-		String[] allFeatures = HBaseAdmin.getColumns("IndexRowTest1","FeatureFamily");
+	//	String[] allFeatures = HBaseAdmin.getColumns("IndexRowTest1","FeatureFamily");
 
-		System.out.println(HBaseAdmin.getRecord("IndexRowTest1","FeatureFamily",allFeatures[0]));
+	//	System.out.println(HBaseAdmin.getRecord("IndexRowTest1","FeatureFamily",allFeatures[0]));
 		
 /*		for(int k = 0; k < allFeatures.length; k++){
 			FeatureSetWeightedHash.put(Integer.parseInt(HBaseAdmin.getRecord("IndexRowTest1","FeatureFamily",allFeatures[k])), allFeatures[k]);
@@ -128,7 +121,7 @@ public class Driver {
 		BufferedReader featReader = readDataFile(filePath);
 		Scanner scanner;
 		StringTokenizer tokenizer; 
-		FeatureSetWeighted Xmlparser = new FeatureSetWeighted();
+		//FeatureSetWeighted Xmlparser = new FeatureSetWeighted();
 		String curLine = "";
 		float maxWeight = 0;
 
@@ -143,7 +136,7 @@ public class Driver {
 			else if(!curLine.equals("</features>") && !curLine.equals("")){	//any line that does not have the closing tag or empty is a feature line
 
 				curLine = " <features>" + curLine +  "</features>"; //adds opening and closing tags to each line so they can be parsed with FeatureSetWeighted Class
-				curLine = Xmlparser.parseXML(curLine); //calls FeatureWeight object to parse XML format to string consisting of the feature and weight 
+			//	curLine = Xmlparser.parseXML(curLine); //calls FeatureWeight object to parse XML format to string consisting of the feature and weight 
 
 				tokenizer = new StringTokenizer(curLine,"\t");
 				feature = tokenizer.nextToken();							//Gets Feature Name
