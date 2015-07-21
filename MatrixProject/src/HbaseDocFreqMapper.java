@@ -24,7 +24,7 @@ public class HbaseDocFreqMapper  extends Mapper<Text, Text, ImmutableBytesWritab
           String feature = featureText.toString();
           String docFreqStr = docFreqText.toString();
           long numOfDocs = 203;
-          double IDF = 0;
+          String IDF = "";
 
           /*
            * Checks the input to the mapper for any null or empty values
@@ -41,14 +41,14 @@ public class HbaseDocFreqMapper  extends Mapper<Text, Text, ImmutableBytesWritab
                  * Inverse Term Frequency 'IDF' is calculated using the equation IDF = log (# of Documents/ document Frequency)
                  */
             	
-            	IDF = Math.log10(numOfDocs/Double.parseDouble(docFreqStr));
+            	IDF =""+ Math.log10(numOfDocs/Double.parseDouble(docFreqStr));
 
             	/*
             	 * Writes all the features and gives them an index in the row Index_Row
             	 */
                 Put put = new Put(Bytes.toBytes("Index_Row"));
                 context.getCounter(Counters.LINES).increment(1);//increments the counter so it can be used as indexer
-                put.addColumn(Bytes.toBytes("FeatureFamily"), Bytes.toBytes(feature), Bytes.toBytes(context.getCounter(Counters.LINES).getValue())); // co ImportFromFile-5-Put Store the original data in a column in the given table.
+                put.addColumn(Bytes.toBytes("FeatureFamily"), Bytes.toBytes(feature), Bytes.toBytes(""+context.getCounter(Counters.LINES).getValue())); // co ImportFromFile-5-Put Store the original data in a column in the given table.
                 context.write(new ImmutableBytesWritable(Bytes.toBytes("Index_Row")), put);
                 /*
                  * Writes all the features and their IDF to the row IDF_Row     

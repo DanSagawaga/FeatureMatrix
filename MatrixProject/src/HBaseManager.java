@@ -40,7 +40,7 @@ public class HBaseManager {
 		scan.setFilter(new FirstKeyOnlyFilter());
 		ResultScanner scanner = htable.getScanner(scan);
 		for (Result result : scanner)
-			System.out.println("Row Key: " + Bytes.toInt(result.getRow()));	 
+			System.out.println("Row Key: " + Bytes.toString(result.getRow()));	 
 		scanner.close();
 	}
 	/*	public boolean recordExists (int rowPar, String familyNamePar, String columnPar)throws IOException{
@@ -146,7 +146,7 @@ public class HBaseManager {
 		Get get = new Get(Bytes.toBytes(rowPar));
 		get.addFamily(Bytes.toBytes(familyNamePar));	   
 		Result result1 = htable.get(get);  	  
-		return "" +(Bytes.toDouble(result1.getValue(Bytes.toBytes(familyNamePar), Bytes.toBytes(columnPar))));
+		return (Bytes.toString(result1.getValue(Bytes.toBytes(familyNamePar), Bytes.toBytes(columnPar))));
 	}
 
 	public  void scanColumn(String familyNamePar, String columnPar )throws IOException{

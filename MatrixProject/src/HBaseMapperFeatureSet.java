@@ -33,8 +33,8 @@ public class HBaseMapperFeatureSet extends Mapper<Text, Text, ImmutableBytesWrit
     public void map(Text DocID, Text line, Context context) throws IOException {
     	
     	String xmlString = line.toString();
-    	double tempWeight = 0, maxWeight = 0, TF = 0;;
-    	String docFreq = "";
+    	double tempWeight = 0, maxWeight = 0;
+    	String docFreq = "", TF = "";
     	Put put = null;
     	
     	
@@ -58,14 +58,14 @@ public class HBaseMapperFeatureSet extends Mapper<Text, Text, ImmutableBytesWrit
 		        /*
 		         * The Term frequency is calculated using the the equation tf(t,d) = .5 + (.5 * f(t,d) ) / maxWeight f(t,d)
 		         */
-		        TF = (.5 + (.5 *tempWeight)/maxWeight);
+		        TF ="" +(.5 + (.5 *tempWeight)/maxWeight);
 		       // docFreq = new String(value.getValue(Bytes.toBytes("IndexRowTest1"), Bytes.toBytes(feature)));
-		//        System.out.println("Mapper Doc ID: " + DocID + " Feature: " + feature + " Term Freq: " + tempWeight/maxWeight);
+		        System.out.println("Mapper Doc ID: " + DocID + " Feature: " + feature + " Term Freq: " + tempWeight/maxWeight);
 
 		        
 		        put = new Put(Bytes.toBytes(DocID.toString()));//sets the row of the hbase matrix to the documnet ID
 			    put.addColumn(Bytes.toBytes("FeatureFamily"), Bytes.toBytes(feature), Bytes.toBytes(TF)); // co ImportFromFile-5-Put Store the original data in a column in the given table.
-		//	    context.write(new ImmutableBytesWritable(Bytes.toBytes(DocID.toString())), put);	
+			    context.write(new ImmutableBytesWritable(Bytes.toBytes(DocID.toString())), put);	
 			} 
 		    weightMap.clear();
 

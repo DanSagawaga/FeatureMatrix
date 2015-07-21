@@ -29,11 +29,12 @@ public class Driver {
 		HBaseAdmin.pickTable("DanTestTable");
 		//HBaseAdmin.deleteTable("DanTestTable");
 
-	//	HBaseAdmin.createTable("DanTestTable","FeatureFamily");
+		//HBaseAdmin.createTable("DanTestTable2","FeatureFamily");
 		HBaseAdmin.listTables();
 		
-		//System.out.println(Arrays.toString(HBaseAdmin.getColumns("Index_Row","FeatureFamily")));
-		System.out.println(HBaseAdmin.getRecord("IDF_Row", "FeatureFamily","Joel Furr"));
+		//HBaseAdmin.getRows("FeatureFamily");
+	//	System.out.println(Arrays.toString(HBaseAdmin.getColumns("Index_Row","FeatureFamily")));
+		System.out.println(HBaseAdmin.getRecord("75914", "FeatureFamily","today"));
 		
 		//	public  String getRecord(String rowPar, String familyNamePar, String columnPar)throws IOException{
 	//	System.out.println(HBaseAdmin.getFamilyNames());

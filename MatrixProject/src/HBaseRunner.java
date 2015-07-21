@@ -36,37 +36,41 @@ public class HBaseRunner  {
 			job.setJarByClass(HBaseRunner.class);
 			job.setJobName("HBaseRunner Job");
 			
+	/*	
 			
-		//	job.setMapperClass(HbaseDocFreqMapper.class);
-			job.setMapperClass(HBaseMapperFeatureSet.class);
-
+			job.setMapperClass(HbaseDocFreqMapper.class);
+	//		job.setMapperClass(HBaseMapperFeatureSet.class);
 			job.setOutputFormatClass(TableOutputFormat.class);
 			job.getConfiguration().set(TableOutputFormat.OUTPUT_TABLE, "DanTestTable");
-			
+			job.setNumReduceTasks(0); 
+
 			FileInputFormat.setInputPaths(job, new Path(args[0]));   
 
+	*/	
 			
-			
-		/*	
+//	/*	
 			Scan scan = new Scan();
-			scan.setCacheBlocks(false);  // don't set to true for MR jobs
+			scan.setCaching(500);        // 1 is the default in Scan, which will be bad for MapReduce jobs
+			scan.setCacheBlocks(false);  //
 			
 			TableMapReduceUtil.initTableMapperJob(
 				"DanTestTable",        // input table
 				scan,               // Scan instance to control CF and attribute selection
 				TFIDF_Mapper.class,     // mapper class
-				Text.class,         // mapper output key
-				IntWritable.class,  // mapper output value
+				null,         // mapper output key
+				null,  // mapper output value
 				job);
+			//job.setOutputFormatClass(NullOutputFormat.class);   // because we aren't emitting anything from mapper
+
 			
 			TableMapReduceUtil.initTableReducerJob(
-				"DanTestTable",        // output table
-				TFIDF_Reducer.class,    // reducer class
+				"DanTestTable2",        // output table
+				null,    // reducer class
 				job);
-			
-			*/
-			
 			job.setNumReduceTasks(0); 
+
+//			*/
+			
 
 
 
