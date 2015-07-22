@@ -24,7 +24,7 @@ public class HBaseRunner  {
 						"\nNOT RIGHT AMOUNT OF ARGUMENTS\n");
 				System.exit(-1);
 			}
-
+//  https://vangjee.wordpress.com/2012/03/20/secondary-sorting-aka-sorting-values-in-hadoops-mapreduce-programming-paradigm/
 		//	/home/cloudera/Desktop/2-100/feature-sets/ne_all/docfreqs/part-00000
 			
 		//   /home/cloudera/Desktop/2-100/feature-sets/ne_all/docfeaturesets-weighted/part-00000	
