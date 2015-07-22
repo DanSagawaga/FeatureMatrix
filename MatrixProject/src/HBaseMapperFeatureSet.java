@@ -23,7 +23,7 @@ import java.util.*;
 
 
 
-public class HBaseMapperFeatureSet extends Mapper<Text, Text, ImmutableBytesWritable, Mutation> {  // co ImportFromFile-2-Mapper Define the mapper class, extending the provided Hadoop class.
+public class HBaseMapperFeatureSet extends Mapper<Text, Text, Text, Text> {  // co ImportFromFile-2-Mapper Define the mapper class, extending the provided Hadoop class.
 
 	private static HashMap<String,Double> weightMap = new HashMap<String,Double>();
 	
@@ -60,12 +60,13 @@ public class HBaseMapperFeatureSet extends Mapper<Text, Text, ImmutableBytesWrit
 		         */
 		        TF ="" +(.5 + (.5 *tempWeight)/maxWeight);
 		       // docFreq = new String(value.getValue(Bytes.toBytes("IndexRowTest1"), Bytes.toBytes(feature)));
-		        System.out.println("Mapper Doc ID: " + DocID + " Feature: " + feature + " Term Freq: " + tempWeight/maxWeight);
+		    //    System.out.println("Mapper Doc ID: " + DocID + " Feature: " + feature + " Term Freq: " + tempWeight/maxWeight);
 
 		        
-		        put = new Put(Bytes.toBytes(DocID.toString()));//sets the row of the hbase matrix to the documnet ID
-			    put.addColumn(Bytes.toBytes("FeatureFamily"), Bytes.toBytes(feature), Bytes.toBytes(TF)); // co ImportFromFile-5-Put Store the original data in a column in the given table.
-			    context.write(new ImmutableBytesWritable(Bytes.toBytes(DocID.toString())), put);	
+		      //  put = new Put(Bytes.toBytes(DocID.toString()));//sets the row of the hbase matrix to the documnet ID
+			  //  put.addColumn(Bytes.toBytes("FeatureFamily"), Bytes.toBytes(feature), Bytes.toBytes(TF)); // co ImportFromFile-5-Put Store the original data in a column in the given table.
+		        
+			    context.write(new Text(feature), new Text(DocID.toString() + "\t" + TF));	
 			} 
 		    weightMap.clear();
 

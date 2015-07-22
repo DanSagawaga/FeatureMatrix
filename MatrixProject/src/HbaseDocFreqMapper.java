@@ -8,7 +8,7 @@ import org.apache.hadoop.hbase.client.Mutation;
 import org.apache.hadoop.hbase.client.Put;
 import java.lang.Math;
 
-public class HbaseDocFreqMapper  extends Mapper<Text, Text, ImmutableBytesWritable, Mutation> { // co ImportFromFile-2-Mapper Define the mapper class, extending the provided Hadoop class.
+public class HbaseDocFreqMapper  extends Mapper<Text, Text, Text, Text> { // co ImportFromFile-2-Mapper Define the mapper class, extending the provided Hadoop class.
 
     public enum Counters { LINES }
 
@@ -43,20 +43,9 @@ public class HbaseDocFreqMapper  extends Mapper<Text, Text, ImmutableBytesWritab
             	
             	IDF =""+ Math.log10(numOfDocs/Double.parseDouble(docFreqStr));
 
-            	/*
-            	 * Writes all the features and gives them an index in the row Index_Row
-            	 */
-                Put put = new Put(Bytes.toBytes("Index_Row"));
-                context.getCounter(Counters.LINES).increment(1);//increments the counter so it can be used as indexer
-                put.addColumn(Bytes.toBytes("FeatureFamily"), Bytes.toBytes(feature), Bytes.toBytes(""+context.getCounter(Counters.LINES).getValue())); // co ImportFromFile-5-Put Store the original data in a column in the given table.
-                context.write(new ImmutableBytesWritable(Bytes.toBytes("Index_Row")), put);
-                /*
-                 * Writes all the features and their IDF to the row IDF_Row     
-                 */
-                put = new Put(Bytes.toBytes("IDF_Row"));
-                put.addColumn(Bytes.toBytes("FeatureFamily"), Bytes.toBytes(feature), Bytes.toBytes(IDF)); // co ImportFromFile-5-Put Store the original data in a column in the given table.
-                context.write(new ImmutableBytesWritable(Bytes.toBytes("IDF_Row")), put);
-                System.out.println("Feature: " + feature + " Index: " + context.getCounter(Counters.LINES).getValue() + " IDF: " + IDF);
+     
+                context.write(new Text(feature), new Text("IDF_Flag " + IDF));
+              //  System.out.println("Feature: " + feature + " Index: " + context.getCounter(Counters.LINES).getValue() + " IDF: " + IDF);
 
             }
            

@@ -13,7 +13,7 @@ import java.io.*;
 import java.util.*;
 
 import org.apache.hadoop.hbase.KeyValue;
-import org.apache.hadoop.hbase.KeyValue;
+import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.KeyValueUtil;
 
 
@@ -22,9 +22,13 @@ import org.apache.hadoop.hbase.KeyValueUtil;
 
 public class TFIDF_Mapper extends TableMapper<ImmutableBytesWritable, Put>  {
 
+ //	private HashMap<String, String> IDF_Map = new HashMap<String, String>(); // <String feature, String index + docFreq>
+
 	public void map(ImmutableBytesWritable rows, Result columns, Context context) throws IOException, InterruptedException {
 
-		HashMap<byte[], byte[]> IDF_Map = new HashMap<byte[], byte[]>(); // <String feature, String index + docFreq>
+		HashMap<String, String> IDF_Map = new HashMap<String, String>(); // <String feature, String index + docFreq>
+		double TFxIDF = 0.0;
+		KeyValue outKeyValue = null;
 
 		
 	//	System.out.println(Bytes.toString(columns.getRow()));
@@ -32,30 +36,55 @@ public class TFIDF_Mapper extends TableMapper<ImmutableBytesWritable, Put>  {
 		
 		
 		try{
-		String keyValueRow = "";
+		String keyValue_Row = "";
 		   for (KeyValue keyValue : columns.raw()) {
 			   
-			   keyValueRow = Bytes.toString(keyValue.getRow());
-			   
-			   if(keyValueRow.equals("IDF_Row"))	 {  
-				   IDF_Map.put(keyValue.getQualifier(), keyValue.getValue());		   
-				System.out.println(Bytes.toString(keyValue.getQualifier()) + "     " + Bytes.toString(keyValue.getValue()));
-			   }
+			   keyValue_Row = new String(keyValue.getRow());
+			   					   
+			   if(keyValue_Row.equals("IDF_Row"))	 {  
+				   IDF_Map.put(Bytes.toString(keyValue.getQualifier()), Bytes.toString(keyValue.getValue()));		   
+			   }			   
 			}
 		   
-		   //creating new keyValue with updated value
-		   for (KeyValue inKeyValue : columns.listKeyValues()) {
-			   keyValueRow = Bytes.toString(inKeyValue.getRow());
-			   if(!keyValueRow.equals("IDF_Row") && !(keyValueRow.equals("Index_Row"))){  
-				   //computes the TFxIDF and writes it to a new keyValue
-				   double TFxIDF = Double.parseDouble(Bytes.toString(inKeyValue.getValue()));
-				   
-				   KeyValue outKeyValue = KeyValueUtil.createKeyValue(inKeyValue.getRow(),inKeyValue.getFamily(),inKeyValue.getQualifier());
+		   
+	//   if(IDF_Map.containsKey("$ 0.02"))
+		//   System.out.println(IDF_Map.get("$ 0.02"));
 
-	//***************   KeyValue(byte[] row, byte[] family, byte[] qualifier, byte[] value)
-				//  Constructs KeyValue structure filled with null value
+			//System.out.println(IDF_Map.size());
+   
+		   //creating new keyValue with updated value
+		   if(!IDF_Map.isEmpty()){
+				System.out.println(IDF_Map.size() + " dfsdfsdf " + columns.size());
+
+		   for (KeyValue keyValue : columns.raw()) {
+			   keyValue_Row = Bytes.toString(keyValue.getRow());
+			   
+			 //  if(!keyValue_Row.equals("IDF_Row") && !(keyValue_Row.equals("Index_Row"))){  
+				   //computes the TFxIDF and writes it to a new keyValue
+				//	System.out.println(Bytes.toString(keyValue.getQualifier()));
+					
+				//		   if(IDF_Map.containsKey(Bytes.toString(keyValue.getQualifier())))
+			  System.out.println(Bytes.toString(keyValue.getRow()) +"\t" + Bytes.toString(keyValue.getQualifier()) +"\t" + IDF_Map.get( Bytes.toString(keyValue.getQualifier())));
+//	System.out.println(IDF_Map.size());
+			   
+/*				   if(IDF_Map.containsKey(Bytes.toString(keyValue.getQualifier()))){
+				   TFxIDF = (Double.parseDouble(Bytes.toString(keyValue.getValue())) * Double.parseDouble((IDF_Map.get(keyValue.getQualifier()))));
+				   outKeyValue =  new KeyValue(keyValue.getRow(),keyValue.getFamily(),keyValue.getQualifier(), Bytes.toBytes("" + TFxIDF));
 				   
-		   }
+					System.out.println("Hello World");
+
+					System.out.println(Bytes.toString(outKeyValue.getRow()) + "\t" +(Bytes.toString(outKeyValue.getQualifier())) + "     " + Bytes.toString(outKeyValue.getValue()));
+				   }
+
+	*/		   	
+				   
+				//System.out.println(Bytes.toString(outKeyValue.getRow()) + "\t" +(Bytes.toString(outKeyValue.getQualifier())) + "     " + Bytes.toString(outKeyValue.getValue()));
+
+				   
+		//   }
+			   
+			   
+			   }
 		   }
 		   
 		
@@ -63,6 +92,23 @@ public class TFIDF_Mapper extends TableMapper<ImmutableBytesWritable, Put>  {
 		catch(Exception e){
 			e.printStackTrace();
 		}
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
    	}
 
   	private static Put resultToPut(ImmutableBytesWritable row, Result result) throws IOException {
@@ -80,30 +126,23 @@ public class TFIDF_Mapper extends TableMapper<ImmutableBytesWritable, Put>  {
    	
    	
    /*	
-Get get = new Get(Bytes.toBytes(rowPar));
-		get.addFamily(Bytes.toBytes(familyNamePar));	   
-		Result result1 = htable.get(get);  	  
-		return "" +(Bytes.toDouble(result1.getValue(Bytes.toBytes(familyNamePar), Bytes.toBytes(columnPar))));
-   	
-   	
-   	
-   	
-   	
-   	
-	public String[] getColumns(String rowPar, String ColumnFamily) throws IOException	{
-		Get get = new Get(Bytes.toBytes(rowPar));
-		//get.addFamily(Bytes.toBytes());	   
-		Result r = htable.get(get); 
 
-		NavigableMap<byte[], byte[]> familyMap = r.getFamilyMap(Bytes.toBytes(ColumnFamily));
-		String[] Quantifers = new String[familyMap.size()];
-
-		int counter = 0;
-		for(byte[] bQunitifer : familyMap.keySet()) {
-			Quantifers[counter++] = Bytes.toString(bQunitifer);
-		}
-
-		return Quantifers;
-	}
 */
 
+/*
+ * 
+ * 		List<Cell> columnList = columns.getColumnCells(Bytes.toBytes("FeatureFamily"),Bytes.toBytes("# 007"));
+		System.out.println(columnList.size() );
+
+		
+		if(!columnList.isEmpty()){
+		Cell IDF_Cell = columnList.get(columnList.size() - 1);
+	//	System.out.println("Last Cell value " +Bytes.toString(IDF_Cell.getValue()));
+		}
+		
+		for(Cell currCell : columnList){
+	//	System.out.println(Bytes.toString(currCell.getQualifier()) + "\t" + Bytes.toString(currCell.getValue()) );
+		}
+ * 
+ * 
+*/
