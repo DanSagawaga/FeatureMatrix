@@ -24,6 +24,7 @@ public class TD_IDF_Reducer  extends Reducer<StockKey,Text,Text,DoubleWritable>
 		String TF_IDF_Matrix_Record = null;
 		String docID = null;
 		double IDF = 0.0, TF = 0.0,TF_IDF = 0.0;
+		long featureIndex = 0;
 
 
 		Scanner scan = null;
@@ -36,6 +37,7 @@ public class TD_IDF_Reducer  extends Reducer<StockKey,Text,Text,DoubleWritable>
 					scan = new Scanner(value.toString());
 					scan.useDelimiter("\t");
 					if(scan.next().equals("IDF_Flag")){
+						featureIndex = Long.parseLong(scan.next());
 						IDF = Double.parseDouble(scan.next());
 					//	System.out.println("IDF: "+ IDF);
 					}
@@ -50,7 +52,8 @@ public class TD_IDF_Reducer  extends Reducer<StockKey,Text,Text,DoubleWritable>
 					docID = scan.next();
 					TF = Double.parseDouble(scan.next());
 					TF_IDF = TF * IDF;
-					System.out.println("DocID: "+docID+" Feature: "+key.getSymbol()+" TF: "+TF+" IDF: "+IDF+" TF_IDF: "+TF_IDF);
+					//System.out.println("DocID: "+docID+" Feature: "+key.getSymbol()+" TF: "+TF+" IDF: "+IDF+" TF_IDF: "+TF_IDF);
+					System.out.println("DocID: "+docID+" FeatureIndex: "+featureIndex+" Feature Name: "+key.getSymbol()+" TF_IDF: "+TF_IDF);
 					context.write(new Text(docID+"\t"+key.getSymbol()),new DoubleWritable(TF_IDF));
 					
 				}

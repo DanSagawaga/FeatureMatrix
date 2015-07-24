@@ -2,6 +2,7 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.util.TreeMap;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.client.Mutation;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.io.IntWritable;
@@ -35,8 +36,8 @@ public class HBaseMapperFeatureSet extends Mapper<Text, Text, StockKey, Text> { 
     	
     	String xmlString = line.toString();
     	double tempWeight = 0, maxWeight = 0;
-    	String docFreq = "", TF = "";
-    	Put put = null;
+    	String TF = "";
+
     	
     	
 		try {
@@ -60,13 +61,7 @@ public class HBaseMapperFeatureSet extends Mapper<Text, Text, StockKey, Text> { 
 		         * The Term frequency is calculated using the the equation tf(t,d) = .5 + (.5 * f(t,d) ) / maxWeight f(t,d)
 		         */
 		        TF ="" +(.5 + (.5 *tempWeight)/maxWeight);
-		       // docFreq = new String(value.getValue(Bytes.toBytes("IndexRowTest1"), Bytes.toBytes(feature)));
-		    //    System.out.println("Mapper Doc ID: " + DocID + " Feature: " + feature + " Term Freq: " + tempWeight/maxWeight);
-
-		        
-		      //  put = new Put(Bytes.toBytes(DocID.toString()));//sets the row of the hbase matrix to the documnet ID
-			  //  put.addColumn(Bytes.toBytes("FeatureFamily"), Bytes.toBytes(feature), Bytes.toBytes(TF)); // co ImportFromFile-5-Put Store the original data in a column in the given table.
-		        
+		    //    System.out.println("Mapper Doc ID: " + DocID + " Feature: " + feature + " Term Freq: " + tempWeight/maxWeight);	        
 			    context.write(new StockKey(feature, Double.parseDouble(DocID.toString())), new Text(DocID.toString() + "\t" + TF));	
 			} 
 		    weightMap.clear();

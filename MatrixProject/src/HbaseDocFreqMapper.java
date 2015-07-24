@@ -1,6 +1,7 @@
 import java.io.IOException;
 
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.io.Text;
@@ -20,11 +21,14 @@ public class HbaseDocFreqMapper  extends Mapper<Text, Text, StockKey, Text> { //
     public void map(Text featureText, Text docFreqText, Context context) // co ImportFromFile-3-Map The map() function transforms the key/value provided by the InputFormat to what is needed by the OutputFormat.
     throws IOException {
       try {
-          
+
+      	Configuration conf = context.getConfiguration();
           String feature = featureText.toString();
           String docFreqStr = docFreqText.toString();
-          long numOfDocs = 203;
           String IDF = "";
+          long totalDocuments = Long.parseLong(conf.get("totalDocuments"));
+              		           
+          
 
           /*
            * Checks the input to the mapper for any null or empty values
@@ -41,12 +45,11 @@ public class HbaseDocFreqMapper  extends Mapper<Text, Text, StockKey, Text> { //
                  * Inverse Term Frequency 'IDF' is calculated using the equation IDF = log (# of Documents/ document Frequency)
                  */
             	
-            	IDF =""+ Math.log10(numOfDocs/Double.parseDouble(docFreqStr));
+            	IDF =""+ Math.log10(totalDocuments/Double.parseDouble(docFreqStr));
 
-        		//StockKey stockKey = new StockKey(feature, -1.0);    		
-        		//context.write(stockKey, stockValue);
-     
-                context.write(new StockKey(feature,-1.0), new Text("IDF_Flag"+"\t" + IDF));
+                context.write(new StockKey(feature,-1.0), new Text("IDF_Flag"+"\t"+context.getCounter(Counters.LINES).getValue()+"\t"+IDF));
+            	context.getCounter(Counters.LINES).increment(1);//increments the counter so it can be used as indexer
+
               //  System.out.println("Feature: " + feature + " Index: " + context.getCounter(Counters.LINES).getValue() + " IDF: " + IDF);
 
             }
