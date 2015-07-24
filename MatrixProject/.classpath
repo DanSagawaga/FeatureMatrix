@@ -11,5 +11,7 @@
 	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/Hbase"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/Hadoop Jars"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/Hadoop"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/Hadoop 2.0"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/Hbase 1.0.1.1"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

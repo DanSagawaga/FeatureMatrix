@@ -17,13 +17,14 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.jdom2.Document;
 import org.jdom2.Element;
 import org.jdom2.input.SAXBuilder;
+import org.apache.hadoop.io.WritableComparable;
 
 
 import java.util.*;
 
 
 
-public class HBaseMapperFeatureSet extends Mapper<Text, Text, Text, Text> {  // co ImportFromFile-2-Mapper Define the mapper class, extending the provided Hadoop class.
+public class HBaseMapperFeatureSet extends Mapper<Text, Text, StockKey, Text> {  // co ImportFromFile-2-Mapper Define the mapper class, extending the provided Hadoop class.
 
 	private static HashMap<String,Double> weightMap = new HashMap<String,Double>();
 	
@@ -66,7 +67,7 @@ public class HBaseMapperFeatureSet extends Mapper<Text, Text, Text, Text> {  // 
 		      //  put = new Put(Bytes.toBytes(DocID.toString()));//sets the row of the hbase matrix to the documnet ID
 			  //  put.addColumn(Bytes.toBytes("FeatureFamily"), Bytes.toBytes(feature), Bytes.toBytes(TF)); // co ImportFromFile-5-Put Store the original data in a column in the given table.
 		        
-			    context.write(new Text(feature), new Text(DocID.toString() + "\t" + TF));	
+			    context.write(new StockKey(feature, Double.parseDouble(DocID.toString())), new Text(DocID.toString() + "\t" + TF));	
 			} 
 		    weightMap.clear();
 

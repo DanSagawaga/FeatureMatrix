@@ -1,22 +1,27 @@
+import java.io.IOException;
+
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.*;
+import org.apache.hadoop.mapreduce.Mapper.Context;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.mapreduce.TableOutputFormat;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.hbase.client.Scan;
-import org.apache.hadoop.mapred.SequenceFileAsTextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.mapreduce.lib.input.MultipleInputs;
-import org.apache.hadoop.util.GenericOptionsParser;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.mapreduce.Reducer;
 
 
 
 public class HBaseRunner  {
+	static long docCount = 0;
+
 	public static void main(String[] args) {
 		try{
 			if (args.length != 2) {
@@ -24,95 +29,72 @@ public class HBaseRunner  {
 						"\nNOT RIGHT AMOUNT OF ARGUMENTS\n");
 				System.exit(-1);
 			}
-//  https://vangjee.wordpress.com/2012/03/20/secondary-sorting-aka-sorting-values-in-hadoops-mapreduce-programming-paradigm/
-		//	/home/cloudera/Desktop/2-100/feature-sets/ne_all/docfreqs/part-00000
-			
-		//   /home/cloudera/Desktop/2-100/feature-sets/ne_all/docfeaturesets-weighted/part-00000	
-			
-			//Configuration conf = HBaseConfiguration.create();
-            Configuration conf =new Configuration();
+				
+			Path docFreqPath = new Path(args[0]);//home/cloudera/Desktop/2-100/feature-sets/ne_all/docfreqs/part-00000			
+			Path featureSetPath = new Path(args[1]);//home/cloudera/Desktop/2-100/feature-sets/ne_all/docfeaturesets-weighted/part-00000
+			Path outputPath = new Path("/Users/dansaganome/Desktop/TF_IDF");
 
-			conf.set("textinputformat.record.delimiter","</features>");
-			
-			Path featureSetWegihted = new Path(args[0]);
-			Path docFreqPath = new Path(args[1]);
-			
-			Path outputPath = new Path("/home/cloudera/Desktop/TF_IDF.txt");
-			
-			Job job = Job.getInstance(conf,"HBaseRunner");
-			job.setJarByClass(HBaseRunner.class);
-			job.setJobName("HBaseRunner Job");
-			
+			/*
+			 * Job 1
+			 */
+			Configuration conf1 = new Configuration();
+			conf1.set("te"
+					+ "xtinputformat.record.delimiter","</features>");
+
+			Job job1 = Job.getInstance(conf1,"HBaseRunner");
+			job1.setJarByClass(HBaseRunner.class);
+			job1.setJobName("HBaseRunner Job");
+
+			/*			job.setPartitionerClass(NaturalKeyPartitioner.class);
+	        job.setGroupingComparatorClass(NaturalKeyGroupingComparator.class);
+	        job.setSortComparatorClass(CompositeKeyComparator.class);
+
 			job.setMapperClass(HbaseDocFreqMapper.class);
 			job.setMapperClass(HBaseMapperFeatureSet.class);
 			job.setReducerClass(TD_IDF_Reducer.class);
-			
+
 			//job.setInputFormatClass(SequenceFileInputFormat.class);
-			job.setOutputKeyClass(Text.class);
+			job.setOutputKeyClass(StockKey.class);
             job.setOutputValueClass(Text.class);
-			
-           MultipleInputs.addInputPath(job, docFreqPath, SequenceFileInputFormat.class, HbaseDocFreqMapper.class);
-           MultipleInputs.addInputPath(job,featureSetWegihted, SequenceFileInputFormat.class, HBaseMapperFeatureSet.class); 
             
-            job.setOutputFormatClass(TextOutputFormat.class);
-            
-            FileOutputFormat.setOutputPath(job, outputPath);
+            //     MultipleInputs.addInputPath(job, docFreqPath, SequenceFileInputFormat.class, HbaseDocFreqMapper.class);
+			//     MultipleInputs.addInputPath(job,featureSetPath, SequenceFileInputFormat.class, HBaseMapperFeatureSet.class); 
+			 */		
+			SequenceFileInputFormat.addInputPath(job1, featureSetPath);
+			job1.setMapperClass(DocCounterMapper.class);
+			job1.setMapperClass(DocCounterMapper.class);
+			job1.setInputFormatClass(SequenceFileInputFormat.class);
+			job1.setReducerClass(DocCounterReducer.class);
+			job1.setOutputKeyClass(Text.class);
+			job1.setOutputValueClass(IntWritable.class);
+			job1.setOutputFormatClass(TextOutputFormat.class); 
+			FileOutputFormat.setOutputPath(job1, null);
 
+			boolean success = job1.waitForCompletion(true);
+			if(success)
+				System.out.println("Doc Number: "+docCount);
 
-			
-	/*	
-			
-		//admin.pickTable("DanTestTable");
-			//admin.putRecord("IndexRowTest1","FeatureFamily", "EmptyFeature", 0);
-			// Configuration conf = admin.getConfiguration();
-			 *
-			job.setMapperClass(HbaseDocFreqMapper.class);
-	//		job.setMapperClass(HBaseMapperFeatureSet.class);
-			job.setOutputFormatClass(TableOutputFormat.class);
-			job.getConfiguration().set(TableOutputFormat.OUTPUT_TABLE, "DanTestTable");
-			job.setNumReduceTasks(0); 
-
-			FileInputFormat.setInputPaths(job, new Path(args[0]));   
-
-	*/	
-			
-	/*
-			Scan scan = new Scan();
-			scan.setCaching(500);        // 1 is the default in Scan, which will be bad for MapReduce jobs
-			scan.setCacheBlocks(false);  //
-			
-			TableMapReduceUtil.initTableMapperJob(
-				"DanTestTable",        // input table
-				scan,               // Scan instance to control CF and attribute selection
-				TFIDF_Mapper.class,     // mapper class
-				null,         // mapper output key
-				null,  // mapper output value
-				job);
-			//job.setOutputFormatClass(NullOutputFormat.class);   // because we aren't emitting anything from mapper
-
-			
-			TableMapReduceUtil.initTableReducerJob(
-				"DanTestTable2",        // output table
-				null,    // reducer class
-				job);
-			job.setNumReduceTasks(0); 
-
-//			*/
-			
-
-
-
-
-
-
-
-			boolean success = job.waitForCompletion(true);
 			System.exit(success ? 0 : 1);
 
 		}
 		catch (Exception e){
 			System.out.println("EXCEPTION CAUGHT HAHAHAHA: " + e.getMessage());	
 		}
-
 	}
+
+	public static class DocCounterMapper extends Mapper<Text, Text, Text, IntWritable> { 
+		public void map(Text DocID, Text line, Context context) throws IOException, InterruptedException {
+			//	System.out.println(DocID.toString());
+			context.write(DocID, new IntWritable(1));
+		}
+	}
+	public static class DocCounterReducer extends Reducer<Text, IntWritable, Text, IntWritable> {
+		public void reduce(Text key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
+			int sum = 0;
+			for (IntWritable val : values) 
+				sum += val.get();
+			docCount += sum;
+		}
+	}
+
 }
