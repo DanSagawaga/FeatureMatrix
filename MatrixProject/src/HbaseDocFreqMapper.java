@@ -9,7 +9,7 @@ import org.apache.hadoop.hbase.client.Mutation;
 import org.apache.hadoop.hbase.client.Put;
 import java.lang.Math;
 
-public class HbaseDocFreqMapper  extends Mapper<Text, Text, StockKey, Text> { // co ImportFromFile-2-Mapper Define the mapper class, extending the provided Hadoop class.
+public class HbaseDocFreqMapper  extends Mapper<Text, Text, CompositeKey, Text> { // co ImportFromFile-2-Mapper Define the mapper class, extending the provided Hadoop class.
 
     public enum Counters { LINES }
 
@@ -47,7 +47,7 @@ public class HbaseDocFreqMapper  extends Mapper<Text, Text, StockKey, Text> { //
             	
             	IDF =""+ Math.log10(totalDocuments/Double.parseDouble(docFreqStr));
 
-                context.write(new StockKey(feature,-1.0), new Text("IDF_Flag"+"\t"+context.getCounter(Counters.LINES).getValue()+"\t"+IDF));
+                context.write(new CompositeKey(feature,-1.0), new Text("IDF_Flag"+"\t"+context.getCounter(Counters.LINES).getValue()+"\t"+IDF));
             	context.getCounter(Counters.LINES).increment(1);//increments the counter so it can be used as indexer
 
               //  System.out.println("Feature: " + feature + " Index: " + context.getCounter(Counters.LINES).getValue() + " IDF: " + IDF);

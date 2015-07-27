@@ -31,23 +31,55 @@ import org.apache.hadoop.mapreduce.lib.input.SequenceFileAsTextInputFormat;
 
 public class HBaseRunner extends Configured implements Tool {
 
-	static Path docFreqPath = null, featureSetPath = null;		
+	static Path docFreqPath = null, featureSetPath = null, classMemPath = null;		
 	static Path outputPath = null, outputPath2 = null,outputPath3 = null,outputPath4 = null;
-	static File[] existingDirs = {new File("/Users/dansaganome/Desktop/TF_IDF")};
+	static File existingDirs[] = new File[1];
 
 	static long totalDocuments = 0, totalRecords = 0, totalFeatures = 0;
 	static boolean jobsSuccess = false;
 	static int splitsNum = 0;
-	static boolean[] jobsToRun = {true,true,true,false};
+	static boolean[] jobsToRun = {true,true,true,true};
 
+	
+	public static void main(String[] args) {
+		try{
+			if (args.length != 1) {
+				System.out.printf(
+						"\nNOT RIGHT AMOUNT OF ARGUMENTS\n");
+				System.exit(-1);
+			}
+
+			docFreqPath = new Path(args[0]+"/feature-sets/ne_all/docfreqs/part-00000");//home/cloudera/Desktop/2-100/feature-sets/ne_all/docfreqs/part-00000			
+			featureSetPath = new Path(args[0]+"feature-sets/ne_all/docfeaturesets-weighted/part-00000");//home/cloudera/Desktop/2-100/feature-sets/ne_all/docfeaturesets-weighted/part-00000
+			classMemPath = new Path(args[0]+"/class-memberships/class-memberships.seq");
+			outputPath = new Path(args[0]+"/TF_IDF/DocumentCounter");///home/cloudera/Documents/TF_IDF
+			outputPath2 = new Path(args[0]+"/TF_IDF/MatrixIntermediateFormat");// /home/cloudera/Documents/TF_IDF
+			outputPath3 = new Path(args[0]+"/TF_IDF/FinalMatrixFormat");///home/cloudera/Documents/TF_IDF
+			outputPath4 = new Path(args[0]+"/TF_IDF/CrossValModel");///home/cloudera/Documents/TF_IDF
+			existingDirs[0] = new File(args[0] + "/TF_IDF");
+
+
+			//Recursively deletes exising output directories
+			deleteDirs(existingDirs);
+
+			ToolRunner.run(new Configuration(), new HBaseRunner(), args);
+
+			//	System.exit(jobsSuccess ? 0 : 1);
+
+		}
+		catch (Exception e){
+			System.out.println("EXCEPTION CAUGHT RED-HANDED: ");
+			e.printStackTrace();	
+		}
+	}
+	
+	
 	public int run(String[] args) throws Exception {
-
 
 		/*
 		 * Job 1 Goes through the DocFeatureSet sequence file to count the number of Documents
 		 * to pass to the next job
 		 */
-		// /*
 		if(jobsToRun[0]){
 			Configuration conf = new Configuration();
 			conf.set("xtinputformat.record.delimiter","</features>");
@@ -66,7 +98,6 @@ public class HBaseRunner extends Configured implements Tool {
 			FileOutputFormat.setOutputPath(job1, outputPath);
 			jobsSuccess = job1.waitForCompletion(true);
 		}
-
 		/*
 		 * Job 2 reads the DocFreq and the FeatureSetWeighted sequence files
 		 * 	DocFreqMapper computes the Inverse document frequency for each feature
@@ -77,7 +108,6 @@ public class HBaseRunner extends Configured implements Tool {
 		 * The output file consists of lines representing a value in the TFxIDF matrix
 		 * Each line will have the format of <Document ID, Feature Index, Feature Name, TFxIDF value>   
 		 */
-		// /*
 		if(jobsToRun[1] && (totalDocuments > 0)){
 			Configuration conf2 = new Configuration();
 			conf2.set("xtinputformat.record.delimiter","</features>");
@@ -99,7 +129,7 @@ public class HBaseRunner extends Configured implements Tool {
 			job2.setGroupingComparatorClass(NaturalKeyGroupingComparator.class);
 			job2.setSortComparatorClass(CompositeKeyComparator.class);
 
-			job2.setMapOutputKeyClass(StockKey.class);
+			job2.setMapOutputKeyClass(CompositeKey.class);
 			job2.setMapOutputValueClass(Text.class);
 
 			job2.setOutputKeyClass(Text.class);
@@ -128,17 +158,26 @@ public class HBaseRunner extends Configured implements Tool {
 			job3.setJobName("Matrix Output Post-Processing");
 
 			job3.setMapperClass(Job3_Mapper.class);
+			job3.setMapperClass(Job3_Mapper_2.class);
 			job3.setReducerClass(Job3_Reducer.class);
-			job3.setMapOutputKeyClass(IntWritable.class);
+			job3.setMapOutputKeyClass(CompositeKey.class);
 			job3.setMapOutputValueClass(Text.class);
 
-			job3.setOutputKeyClass(IntWritable.class);
-			job3.setOutputValueClass(Text.class);
+			job3.setPartitionerClass(NaturalKeyPartitioner.class);
+			job3.setGroupingComparatorClass(NaturalKeyGroupingComparator.class);
+			job3.setSortComparatorClass(CompositeKeyComparator.class);
+			
 			job3.setInputFormatClass(SequenceFileInputFormat .class);
-			job3.setOutputFormatClass(SequenceFileOutputFormat.class);
 
 			outputPath2 = new Path(outputPath2.toString()+"/Seq-r-00000");
-			SequenceFileInputFormat.addInputPath(job3, outputPath2);
+			MultipleInputs.addInputPath(job3, outputPath2, SequenceFileInputFormat.class, Job3_Mapper.class);
+			MultipleInputs.addInputPath(job3,classMemPath, SequenceFileInputFormat.class, Job3_Mapper_2.class);
+
+			job3.setOutputKeyClass(Text.class);
+			job3.setOutputValueClass(Text.class);
+			job3.setOutputFormatClass(SequenceFileOutputFormat.class);
+
+
 			
 			//MultipleOutputs.addNamedOutput(job3, "FeatureIndexKeyText", TextOutputFormat.class, Text.class, DoubleWritable.class);
 			//MultipleOutputs.addNamedOutput(job3, "Seq",SequenceFileOutputFormat.class,Text.class, DoubleWritable.class);
@@ -162,8 +201,6 @@ public class HBaseRunner extends Configured implements Tool {
 		    conf4.setInt("splitsNum",splitsNum);
 			conf4.setLong("totalDocuments", totalDocuments);
 			conf4.setLong("totalFeatures", 2180);
-
-
 
 			Job job4 = Job.getInstance(conf4,"Nth Split Cross Validation"); 
 
@@ -197,37 +234,6 @@ public class HBaseRunner extends Configured implements Tool {
 		else return 1;
 	}
 
-	public static void main(String[] args) {
-		try{
-			if (args.length != 2) {
-				System.out.printf(
-						"\nNOT RIGHT AMOUNT OF ARGUMENTS\n");
-				System.exit(-1);
-			}
-
-			docFreqPath = new Path(args[0]);//home/cloudera/Desktop/2-100/feature-sets/ne_all/docfreqs/part-00000			
-			featureSetPath = new Path(args[1]);//home/cloudera/Desktop/2-100/feature-sets/ne_all/docfeaturesets-weighted/part-00000
-			outputPath = new Path("/Users/dansaganome/Desktop/TF_IDF/DocumentCounter");///home/cloudera/Documents/TF_IDF
-			outputPath2 = new Path("/Users/dansaganome/Desktop/TF_IDF/MatrixIntermediateFormat");// /home/cloudera/Documents/TF_IDF
-			outputPath3 = new Path("/Users/dansaganome/Desktop/TF_IDF/FinalMatrixFormat");///home/cloudera/Documents/TF_IDF
-			outputPath4 = new Path("/Users/dansaganome/Desktop/TF_IDF/CrossValModel");///home/cloudera/Documents/TF_IDF
-
-
-			//Recursively deletes exising output directories
-			deleteDirs(existingDirs);
-
-			ToolRunner.run(new Configuration(), new HBaseRunner(), args);
-
-			//	System.exit(jobsSuccess ? 0 : 1);
-
-		}
-		catch (Exception e){
-			System.out.println("EXCEPTION CAUGHT RED-HANDED: ");
-			e.printStackTrace();	
-		}
-	}
-
-
 
 
 
@@ -246,7 +252,7 @@ public class HBaseRunner extends Configured implements Tool {
 		}
 	}
 
-	public static class TD_IDF_Reducer extends Reducer<StockKey,Text,Text,DoubleWritable>{
+	public static class TD_IDF_Reducer extends Reducer<CompositeKey,Text,Text,DoubleWritable>{
 		MultipleOutputs<Text, DoubleWritable> mos;
 
 
@@ -259,7 +265,7 @@ public class HBaseRunner extends Configured implements Tool {
 			mos.close();
 		}
 
-		public void reduce(StockKey key, Iterable<Text> valueList, Context context)throws IOException , InterruptedException{
+		public void reduce(CompositeKey key, Iterable<Text> valueList, Context context)throws IOException , InterruptedException{
 			long recordCount = 0, featureCount = 0;
 			String docID = null;
 			double IDF = 0.0, TF = 0.0,TF_IDF = 0.0;
@@ -282,7 +288,7 @@ public class HBaseRunner extends Configured implements Tool {
 							featureCount = featureIndex;
 					}
 					else{
-						System.out.println("Error in Reducer: IDF Key not found for feature: "+key.getSymbol());
+						System.out.println("Error in Reducer: IDF Key not found for feature: "+key.getPrimaryKey());
 						break;
 					}	
 				}
@@ -304,7 +310,7 @@ public class HBaseRunner extends Configured implements Tool {
 			}
 			totalRecords += recordCount;
 			totalFeatures = featureCount;
-			mos.write("FeatureIndexKeyText",new Text(key.getSymbol()+ "\t"+featureIndex),null);
+			mos.write("FeatureIndexKeyText",new Text(key.getPrimaryKey()+ "\t"+featureIndex),null);
 
 		}
 

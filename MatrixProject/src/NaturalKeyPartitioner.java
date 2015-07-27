@@ -2,16 +2,16 @@ import org.apache.hadoop.io.DoubleWritable;
 import org.apache.hadoop.mapreduce.Partitioner;
 
 /**
- * Partitions key based on "natural" key of {@link StockKey} (which
+ * Partitions key based on "natural" key of {@link CompositeKey} (which
  * is the symbol).
  * @author Jee Vang
  *
  */
-public class NaturalKeyPartitioner extends Partitioner<StockKey, DoubleWritable> {
+public class NaturalKeyPartitioner extends Partitioner<CompositeKey, DoubleWritable> {
 
 	@Override
-	public int getPartition(StockKey key, DoubleWritable val, int numPartitions) {
-		int hash = key.getSymbol().hashCode();
+	public int getPartition(CompositeKey key, DoubleWritable val, int numPartitions) {
+		int hash = key.getPrimaryKey().hashCode();
 		int partition = hash % numPartitions;
 		return partition;
 	}

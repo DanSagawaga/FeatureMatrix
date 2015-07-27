@@ -14,7 +14,7 @@ import java.util.*;
 
 
 
-public class HBaseMapperFeatureSet extends Mapper<Text, Text, StockKey, Text> {  // co ImportFromFile-2-Mapper Define the mapper class, extending the provided Hadoop class.
+public class HBaseMapperFeatureSet extends Mapper<Text, Text, CompositeKey, Text> {  // co ImportFromFile-2-Mapper Define the mapper class, extending the provided Hadoop class.
 
 	private static HashMap<String,Double> weightMap = new HashMap<String,Double>();
 	
@@ -51,7 +51,7 @@ public class HBaseMapperFeatureSet extends Mapper<Text, Text, StockKey, Text> { 
 		         */
 		        TF ="" +(.5 + (.5 *tempWeight)/maxWeight);
 		    //    System.out.println("Mapper Doc ID: " + DocID + " Feature: " + feature + " Term Freq: " + tempWeight/maxWeight);	        
-			    context.write(new StockKey(feature, Double.parseDouble(DocID.toString())), new Text(DocID.toString() + "\t" + TF));	
+			    context.write(new CompositeKey(feature, Double.parseDouble(DocID.toString())), new Text(DocID.toString() + "\t" + TF));	
 			} 
 		    weightMap.clear();
 

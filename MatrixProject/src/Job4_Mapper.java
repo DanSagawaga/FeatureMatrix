@@ -12,7 +12,7 @@ import java.util.*;
 
 
 
-public class Job4_Mapper extends Mapper<IntWritable, Text, IntWritable, Text>{
+public class Job4_Mapper extends Mapper<Text, Text, IntWritable, Text>{
 
     public enum Job4_Mapper_Counter { LINES }
     public static long totalDocuments = 0;
@@ -31,9 +31,13 @@ public class Job4_Mapper extends Mapper<IntWritable, Text, IntWritable, Text>{
 		}
 	}
 
-	public void map(IntWritable DocID, Text line, Context context) throws IOException, InterruptedException {
+	public void map(Text docID_Classifier_Text, Text feature_Set, Context context) throws IOException, InterruptedException {
 		context.getCounter(Job4_Mapper_Counter.LINES).increment(1);//increments the counter so it can be used as indexer
 		long docCounter = context.getCounter(Job4_Mapper_Counter.LINES).getValue();
+		
+		String[] docID_Classifier_Str = docID_Classifier_Text.toString().split("\t");
+		
+	//	System.out.println(docID_Classifier_Str[0] + "\t"+ docID_Classifier_Str[1]);
 		
 /*
 		for(int k = 0; k < documentPartitions.length; k++){		
@@ -47,23 +51,6 @@ public class Job4_Mapper extends Mapper<IntWritable, Text, IntWritable, Text>{
 		
 		
 //		System.out.println("Document#: " + docCounter+ " " + randomGenerator.nextInt((int)totalDocuments/10));
-		context.write(new IntWritable(randomGenerator.nextInt((int)totalDocuments/10)), new Text(DocID + line.toString())); 
+		context.write(new IntWritable(randomGenerator.nextInt(10)), new Text(docID_Classifier_Str[0] + "\t"+ docID_Classifier_Str[1]+"\n"+feature_Set.toString())); 
 	}
 }
-/*
-TaskAttemptID tid = context.getTaskAttemptID();
-
-// Set up the weka configuration
-Configuration conf = context.getConfiguration();
-int numMaps = Integer.parseInt(conf.get("splitsNum"));
-//  classname = wekaConfig.get("Run.classify");
-
-String[] splitter = tid.toString().split("_");
-String jobNumber = "";
-int n = 0;
-
-if (splitter[4].length() > 0) {
-	jobNumber = splitter[4].substring(splitter[4].length() - 1);
-	n = Integer.parseInt(jobNumber);
-}
- */
