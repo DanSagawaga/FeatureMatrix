@@ -27,7 +27,7 @@ import weka.core.SparseInstance;
 import weka.core.Attribute;
 import weka.classifiers.functions.Logistic;
 import weka.classifiers.functions.SGD;
-
+import java.nio.file.FileSystem;
 
 public class Job4_Combiner extends Reducer<IntWritable,Text,IntWritable,Text> {
 
@@ -35,7 +35,7 @@ public class Job4_Combiner extends Reducer<IntWritable,Text,IntWritable,Text> {
 	static ArrayList<Attribute> attributes = new ArrayList<Attribute>();
 	static AggregateableEvaluation[] NB_Eval = new AggregateableEvaluation[2];
 	static AggregateableEvaluation[] LG_Eval = new AggregateableEvaluation[2];
-	static AggregateableEvaluation[] SGD_Eval = new AggregateableEvaluation[2];
+//	static AggregateableEvaluation[] SGD_Eval = new AggregateableEvaluation[2];
 
 
 	static String classname = "weka.classifiers.trees.J48";
@@ -43,7 +43,7 @@ public class Job4_Combiner extends Reducer<IntWritable,Text,IntWritable,Text> {
 	
 	static NaiveBayes[] NB_Classifier = {new NaiveBayes(),new NaiveBayes()};
 	static Logistic[] LG_Classifier = {new Logistic(), new Logistic()};
-	static SGD[] SGD_Classifier = {new SGD(), new SGD()};
+//	static SGD[] SGD_Classifier = {new SGD(), new SGD()};
 
 	
 	static Integer testInt = null;
@@ -63,7 +63,7 @@ public class Job4_Combiner extends Reducer<IntWritable,Text,IntWritable,Text> {
 		for(int k =0; k < totalFeatures + 1 ; k++)
 			attributes.add(new Attribute(""+k));
 
-		ArrayList classifierList = new ArrayList();
+		ArrayList<String> classifierList = new ArrayList<String>();
 		classifierList.add("Rec.Autos");
 		classifierList.add("talk.politics.mideast");
 		attributes.add(new Attribute("Classifiers",classifierList));
@@ -80,8 +80,8 @@ public class Job4_Combiner extends Reducer<IntWritable,Text,IntWritable,Text> {
 			NB_Eval[1] = new AggregateableEvaluation(dataset);
 			LG_Eval[0] = new AggregateableEvaluation(dataset);
 			LG_Eval[1] = new AggregateableEvaluation(dataset);
-			SGD_Eval[0] = new AggregateableEvaluation(dataset);
-			SGD_Eval[1] = new AggregateableEvaluation(dataset);
+	//		SGD_Eval[0] = new AggregateableEvaluation(dataset);
+	//		SGD_Eval[1] = new AggregateableEvaluation(dataset);
 
 
 		}catch(Exception e){
@@ -103,7 +103,6 @@ public class Job4_Combiner extends Reducer<IntWritable,Text,IntWritable,Text> {
 
 		dataset.setClassIndex(totalFeatures+1);
 		//System.out.println(dataset.classIndex());
-
 
 		if(key.get() <= 6){
 			for (Text val : values) {
@@ -147,7 +146,7 @@ public class Job4_Combiner extends Reducer<IntWritable,Text,IntWritable,Text> {
 						if(key.get() == 0 && count == 0){
 							NB_Classifier[0].buildClassifier(dataset);
 							LG_Classifier[0].buildClassifier(dataset);
-							SGD_Classifier[0].buildClassifier(dataset);
+				//			SGD_Classifier[0].buildClassifier(dataset);
 
 							dataset.delete();
 							count++;		
@@ -155,13 +154,13 @@ public class Job4_Combiner extends Reducer<IntWritable,Text,IntWritable,Text> {
 						else{
 							NB_Classifier[1].buildClassifier(dataset);
 							LG_Classifier[1].buildClassifier(dataset);
-							SGD_Classifier[1].buildClassifier(dataset);
+				//			SGD_Classifier[1].buildClassifier(dataset);
 
 							
 							NB_Classifier[0] = NB_Classifier[0].aggregate(NB_Classifier[1]);
 							LG_Classifier[0] = LG_Classifier[0].aggregate(LG_Classifier[1]);
 							
-							SGD_Classifier[0] = SGD_Classifier[0].aggregate(SGD_Classifier[1]);
+				//			SGD_Classifier[0] = SGD_Classifier[0].aggregate(SGD_Classifier[1]);
 
 							dataset.delete();
 							count++;		
@@ -175,8 +174,8 @@ public class Job4_Combiner extends Reducer<IntWritable,Text,IntWritable,Text> {
 						LG_Eval[1].evaluateModel(LG_Classifier[0], dataset);
 						LG_Eval[0].aggregate(LG_Eval[1]);
 						
-						SGD_Eval[1].evaluateModel(LG_Classifier[0], dataset);
-						SGD_Eval[0].aggregate(SGD_Eval[1]);
+				//		SGD_Eval[1].evaluateModel(LG_Classifier[0], dataset);
+				//		SGD_Eval[0].aggregate(SGD_Eval[1]);
 	
 						dataset.delete();
 
@@ -213,7 +212,7 @@ public class Job4_Combiner extends Reducer<IntWritable,Text,IntWritable,Text> {
 		System.out.println("Number of Insances trained "+ count);
 		System.out.println("Naive Bayes Acurracy Ratio: "+ NB_Eval[0].pctCorrect()+" | " +NB_Eval[0].pctIncorrect() );
 		System.out.println("Logistic Acurracy Ratio: "+ LG_Eval[0].pctCorrect()+" | " +LG_Eval[0].pctIncorrect() );
-		System.out.println("Random Forest Acurracy Ratio:  "+ SGD_Eval[0].pctCorrect()+" | " +SGD_Eval[0].pctIncorrect());
+	//	System.out.println("Random Forest Acurracy Ratio:  "+ SGD_Eval[0].pctCorrect()+" | " +SGD_Eval[0].pctIncorrect());
 	}
 }
 

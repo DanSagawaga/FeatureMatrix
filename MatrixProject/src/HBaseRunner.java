@@ -1,6 +1,7 @@
 import java.io.IOException;
 import java.util.Scanner;
 
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.*;
 import org.apache.hadoop.mapreduce.Mapper.Context;
@@ -201,7 +202,18 @@ public class HBaseRunner extends Configured implements Tool {
 		    conf4.setInt("splitsNum",splitsNum);
 			conf4.setLong("totalDocuments", totalDocuments);
 			conf4.setLong("totalFeatures", 2180);
+			
+			//conf4.set("fs.defaultFS", "hdfs://0.0.0.0:8020");
+	/*		FileSystem fs = FileSystem.get(conf4);
 
+			Configuration cconf = fs.getConf();
+			cconf.setLong("dfs.blocksize",49664);
+			String block = cconf.get("dfs.blocksize");
+			System.out.println(block);
+			fs.close();
+*/
+
+			
 			Job job4 = Job.getInstance(conf4,"Nth Split Cross Validation"); 
 
 			job4.setJarByClass(HBaseRunner.class);
@@ -211,7 +223,7 @@ public class HBaseRunner extends Configured implements Tool {
 			job4.setMapperClass(Job4_Mapper.class);
 			job4.setMapOutputKeyClass(IntWritable.class);
 			job4.setMapOutputValueClass(Text.class);
-			job4.setCombinerClass(Job4_Combiner.class);
+			//job4.setCombinerClass(Job4_Combiner.class);
 			job4.setReducerClass(Job4_Reducer.class);
 			
 			SequenceFileInputFormat.addInputPath(job4, outputPath3);
