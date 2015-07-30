@@ -36,12 +36,12 @@ public class HBaseRunner extends Configured implements Tool {
 	static Path outputPath = null, outputPath2 = null,outputPath3 = null,outputPath4 = null;
 	static File existingDirs[] = new File[1];
 
-	static long totalDocuments = 0, totalRecords = 0, totalFeatures = 0;
+	static long totalDocuments = 0, totalRecords = 0, totalFeatures = 0, startTime = 0, stopTime = 0, totalStartTime = 0, totalStopTime = 0;
 	static boolean jobsSuccess = false;
-	static int splitsNum = 0;
+	static int instanceSize = 0;
 	static boolean[] jobsToRun = {true,true,true,true};
 
-	
+
 	public static void main(String[] args) {
 		try{
 			if (args.length != 1) {
@@ -56,12 +56,13 @@ public class HBaseRunner extends Configured implements Tool {
 			outputPath = new Path(args[0]+"/TF_IDF/DocumentCounter");///home/cloudera/Documents/TF_IDF
 			outputPath2 = new Path(args[0]+"/TF_IDF/MatrixIntermediateFormat");// /home/cloudera/Documents/TF_IDF
 			outputPath3 = new Path(args[0]+"/TF_IDF/FinalMatrixFormat");///home/cloudera/Documents/TF_IDF
-			outputPath4 = new Path(args[0]+"/TF_IDF/CrossValModel");///home/cloudera/Documents/TF_IDF
+			outputPath4 = new Path(args[0]+"/TF_IDF/SplitMatrixFolds");///home/cloudera/Documents/TF_IDF
 			existingDirs[0] = new File(args[0] + "/TF_IDF");
 
 
 			//Recursively deletes exising output directories
 			deleteDirs(existingDirs);
+			//
 
 			ToolRunner.run(new Configuration(), new HBaseRunner(), args);
 
@@ -73,15 +74,19 @@ public class HBaseRunner extends Configured implements Tool {
 			e.printStackTrace();	
 		}
 	}
-	
-	
+
+
 	public int run(String[] args) throws Exception {
 
 		/*
 		 * Job 1 Goes through the DocFeatureSet sequence file to count the number of Documents
 		 * to pass to the next job
 		 */
+	    totalStartTime = System.currentTimeMillis();
+
 		if(jobsToRun[0]){
+    	    startTime = System.currentTimeMillis();
+
 			Configuration conf = new Configuration();
 			conf.set("xtinputformat.record.delimiter","</features>");
 
@@ -98,6 +103,10 @@ public class HBaseRunner extends Configured implements Tool {
 			LazyOutputFormat.setOutputFormatClass(job1, TextOutputFormat.class);
 			FileOutputFormat.setOutputPath(job1, outputPath);
 			jobsSuccess = job1.waitForCompletion(true);
+			
+    	    stopTime = System.currentTimeMillis();
+    	    System.out.println("********** Job 1 Done. Total Time (ms): " + (stopTime-startTime)+" **********");
+
 		}
 		/*
 		 * Job 2 reads the DocFreq and the FeatureSetWeighted sequence files
@@ -110,6 +119,7 @@ public class HBaseRunner extends Configured implements Tool {
 		 * Each line will have the format of <Document ID, Feature Index, Feature Name, TFxIDF value>   
 		 */
 		if(jobsToRun[1] && (totalDocuments > 0)){
+    	    startTime = System.currentTimeMillis();
 			Configuration conf2 = new Configuration();
 			conf2.set("xtinputformat.record.delimiter","</features>");
 			conf2.set("totalDocuments",""+totalDocuments);
@@ -143,6 +153,10 @@ public class HBaseRunner extends Configured implements Tool {
 			FileOutputFormat.setOutputPath(job2, outputPath2);
 
 			jobsSuccess = job2.waitForCompletion(true);
+			
+    	    stopTime = System.currentTimeMillis();
+    	    System.out.println("********** Job 2 Done. Total Time (ms): " + (stopTime-startTime)+" **********");
+
 		}		
 
 		/*
@@ -151,10 +165,12 @@ public class HBaseRunner extends Configured implements Tool {
 		 * This relational format is needed to use as weka datasets in the next job
 		 */
 		if(jobsToRun[2]){
+    	    startTime = System.currentTimeMillis();
+
 			Configuration conf3 = new Configuration();
 
 			Job job3 = Job.getInstance(conf3,"Matrix Output Post-Processing");
-			
+
 			job3.setJarByClass(HBaseRunner.class);
 			job3.setJobName("Matrix Output Post-Processing");
 
@@ -167,7 +183,7 @@ public class HBaseRunner extends Configured implements Tool {
 			job3.setPartitionerClass(NaturalKeyPartitioner.class);
 			job3.setGroupingComparatorClass(NaturalKeyGroupingComparator.class);
 			job3.setSortComparatorClass(CompositeKeyComparator.class);
-			
+
 			job3.setInputFormatClass(SequenceFileInputFormat .class);
 
 			outputPath2 = new Path(outputPath2.toString()+"/Seq-r-00000");
@@ -178,66 +194,70 @@ public class HBaseRunner extends Configured implements Tool {
 			job3.setOutputValueClass(Text.class);
 			job3.setOutputFormatClass(SequenceFileOutputFormat.class);
 
-
-			
 			//MultipleOutputs.addNamedOutput(job3, "FeatureIndexKeyText", TextOutputFormat.class, Text.class, DoubleWritable.class);
 			//MultipleOutputs.addNamedOutput(job3, "Seq",SequenceFileOutputFormat.class,Text.class, DoubleWritable.class);
-			
+
 			FileOutputFormat.setOutputPath(job3, outputPath3);
 
 			SequenceFileOutputFormat.setOutputPath(job3,outputPath3);
 
 			jobsSuccess = job3.waitForCompletion(true);
+			
+    	    stopTime = System.currentTimeMillis();
+    	    System.out.println("********** Job 3 Done. Total Time (ms): " + (stopTime-startTime)+" **********");
+
 		}
-		
+
 		/*
 		 * Job 4 Alpha: Read from Sequence File and do a Cross-Validation on splits of the matrix
 		 */
-		
+
 		if(jobsToRun[3]){
+    	    startTime = System.currentTimeMillis();
 
 			Configuration conf4 = new Configuration();
 			totalDocuments = 197;
-			splitsNum = (int)totalRecords/50;
-		    conf4.setInt("splitsNum",splitsNum);
 			conf4.setLong("totalDocuments", totalDocuments);
 			conf4.setLong("totalFeatures", 2180);
-			
-			//conf4.set("fs.defaultFS", "hdfs://0.0.0.0:8020");
-	/*		FileSystem fs = FileSystem.get(conf4);
+			instanceSize = 200;
+			conf4.setInt("instanceSize", instanceSize);
 
-			Configuration cconf = fs.getConf();
-			cconf.setLong("dfs.blocksize",49664);
-			String block = cconf.get("dfs.blocksize");
-			System.out.println(block);
-			fs.close();
-*/
-
-			
 			Job job4 = Job.getInstance(conf4,"Nth Split Cross Validation"); 
 
 			job4.setJarByClass(HBaseRunner.class);
 			job4.setJobName("Nth Split Cross Validation");
-			
+
 			job4.setInputFormatClass(SequenceFileInputFormat.class);
 			job4.setMapperClass(Job4_Mapper.class);
 			job4.setMapOutputKeyClass(IntWritable.class);
 			job4.setMapOutputValueClass(Text.class);
 			//job4.setCombinerClass(Job4_Combiner.class);
-			job4.setReducerClass(Job4_Reducer.class);
 			
+			job4.setReducerClass(Job4_Reducer.class);
+
 			SequenceFileInputFormat.addInputPath(job4, outputPath3);
 			FileOutputFormat.setOutputPath(job4, outputPath4);
-			
-			//job4.setInputFormatClass(NLineInputFormat.class);
-	        //NLineInputFormat.addInputPath(job4, outputPath3);
+
+			MultipleOutputs.addNamedOutput(job4, "MatrixFold0",TextOutputFormat.class,Text.class, Text.class);
+			MultipleOutputs.addNamedOutput(job4, "MatrixFold1",TextOutputFormat.class,Text.class, Text.class);
+			MultipleOutputs.addNamedOutput(job4, "MatrixFold2",TextOutputFormat.class,Text.class, Text.class);
+			MultipleOutputs.addNamedOutput(job4, "MatrixFold3",TextOutputFormat.class,Text.class, Text.class);
+			MultipleOutputs.addNamedOutput(job4, "MatrixFold4",TextOutputFormat.class,Text.class, Text.class);
+			MultipleOutputs.addNamedOutput(job4, "MatrixFold5",TextOutputFormat.class,Text.class, Text.class);
+			MultipleOutputs.addNamedOutput(job4, "MatrixFold6",TextOutputFormat.class,Text.class, Text.class);
+			MultipleOutputs.addNamedOutput(job4, "MatrixFold7",TextOutputFormat.class,Text.class, Text.class);
+			MultipleOutputs.addNamedOutput(job4, "MatrixFold8",TextOutputFormat.class,Text.class, Text.class);
+			MultipleOutputs.addNamedOutput(job4, "MatrixFold9",TextOutputFormat.class,Text.class, Text.class);
 			
 			jobsSuccess = job4.waitForCompletion(true);
-
+    	    stopTime = System.currentTimeMillis();
+    	    System.out.println("********** Job 4 Done. Total Time (ms): " + (stopTime-startTime)+" **********");
 		}
 
 
 		if(jobsSuccess){
+    	    totalStopTime = System.currentTimeMillis();
+    	    System.out.println("********** All Jobs Done. Total Time: " + (totalStopTime -totalStartTime)+" **********");
 			System.out.println("Number of Documents: "+totalDocuments+
 					"\nNumber of Features: "+totalFeatures+
 					"\nNumber of Records: "+totalRecords);
@@ -328,6 +348,25 @@ public class HBaseRunner extends Configured implements Tool {
 
 	}
 
+	private static int getInstanceSize(){
+		 Scanner sc = new Scanner(System.in);
+		 int intInputValue = 0;
+	        while (true) {
+	            System.out.println("Enter number of documents fo be evaluated per Mapper");
+	            String input = sc.nextLine();
+	           // int intInputValue = 0;
+	            try {
+	                intInputValue = Integer.parseInt(input);
+	                sc.close();
+	                break;
+	            } catch (Exception ne) {
+	                System.out.println("Input is not a number, try again");
+	            }
+	        }
+	        sc.close();
+	        return intInputValue;
+	}
+
 
 	/*
 	 * Method is used to delete existing directories that can create a conflict
@@ -355,14 +394,15 @@ public class HBaseRunner extends Configured implements Tool {
 						delete(existingDirs[k]);
 					}
 				}
-				scan.close();
 			} else{
 				System.out.println("Not Deleting Directories");
-				scan.close();
 				//System.exit(0);
 
 			}
 		}
+		
+		
+		
 	}
 
 	public static void delete(File file)throws IOException{
