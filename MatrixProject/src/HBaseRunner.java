@@ -56,14 +56,12 @@ public class HBaseRunner extends Configured implements Tool {
 			outputPath = new Path(args[0]+"/TF_IDF/DocumentCounter");///home/cloudera/Documents/TF_IDF
 			outputPath2 = new Path(args[0]+"/TF_IDF/MatrixIntermediateFormat");// /home/cloudera/Documents/TF_IDF
 			outputPath3 = new Path(args[0]+"/TF_IDF/FinalMatrixFormat");///home/cloudera/Documents/TF_IDF
-			outputPath4 = new Path(args[0]+"/TF_IDF/SplitMatrixFolds");///home/cloudera/Documents/TF_IDF
+			outputPath4 = new Path(args[0]+"/TF_IDF/ClassifierModels");///home/cloudera/Documents/TF_IDF
 			existingDirs[0] = new File(args[0] + "/TF_IDF");
-
 
 			//Recursively deletes exising output directories
 			deleteDirs(existingDirs);
-			//
-
+			
 			ToolRunner.run(new Configuration(), new HBaseRunner(), args);
 
 			//	System.exit(jobsSuccess ? 0 : 1);
@@ -217,10 +215,11 @@ public class HBaseRunner extends Configured implements Tool {
 
 			Configuration conf4 = new Configuration();
 			totalDocuments = 197;
+			instanceSize = 200;
 			conf4.setLong("totalDocuments", totalDocuments);
 			conf4.setLong("totalFeatures", 2180);
-			instanceSize = 200;
 			conf4.setInt("instanceSize", instanceSize);
+			conf4.set("modelsPath", args[0]+"/TF_IDF/ClassifierModels/");
 
 			Job job4 = Job.getInstance(conf4,"Nth Split Cross Validation"); 
 
@@ -231,23 +230,16 @@ public class HBaseRunner extends Configured implements Tool {
 			job4.setMapperClass(Job4_Mapper.class);
 			job4.setMapOutputKeyClass(IntWritable.class);
 			job4.setMapOutputValueClass(Text.class);
-			//job4.setCombinerClass(Job4_Combiner.class);
-			
+			job4.setCombinerClass(Job4_Combiner.class);
 			job4.setReducerClass(Job4_Reducer.class);
+			//job4.setNumReduceTasks(10);
 
 			SequenceFileInputFormat.addInputPath(job4, outputPath3);
 			FileOutputFormat.setOutputPath(job4, outputPath4);
 
-			MultipleOutputs.addNamedOutput(job4, "MatrixFold0",TextOutputFormat.class,Text.class, Text.class);
-			MultipleOutputs.addNamedOutput(job4, "MatrixFold1",TextOutputFormat.class,Text.class, Text.class);
-			MultipleOutputs.addNamedOutput(job4, "MatrixFold2",TextOutputFormat.class,Text.class, Text.class);
-			MultipleOutputs.addNamedOutput(job4, "MatrixFold3",TextOutputFormat.class,Text.class, Text.class);
-			MultipleOutputs.addNamedOutput(job4, "MatrixFold4",TextOutputFormat.class,Text.class, Text.class);
-			MultipleOutputs.addNamedOutput(job4, "MatrixFold5",TextOutputFormat.class,Text.class, Text.class);
-			MultipleOutputs.addNamedOutput(job4, "MatrixFold6",TextOutputFormat.class,Text.class, Text.class);
-			MultipleOutputs.addNamedOutput(job4, "MatrixFold7",TextOutputFormat.class,Text.class, Text.class);
-			MultipleOutputs.addNamedOutput(job4, "MatrixFold8",TextOutputFormat.class,Text.class, Text.class);
-			MultipleOutputs.addNamedOutput(job4, "MatrixFold9",TextOutputFormat.class,Text.class, Text.class);
+		//	MultipleOutputs.addNamedOutput(job4, "MatrixFold0",TextOutputFormat.class,Text.class, Text.class);
+		//	MultipleOutputs.addNamedOutput(job4, "MatrixFold1",TextOutputFormat.class,Text.class, Text.class);
+
 			
 			jobsSuccess = job4.waitForCompletion(true);
     	    stopTime = System.currentTimeMillis();

@@ -34,17 +34,16 @@ public class Job4_Mapper extends Mapper<Text, Text, IntWritable, Text>{
 		context.getCounter(Job4_Mapper_Counter.LINES).increment(1);//increments the counter so it can be used as indexer
 		long docCounter = context.getCounter(Job4_Mapper_Counter.LINES).getValue();
 
-		if(docCounter%numDocsInFold != 0){
+		if(docCounter%(numDocsInFold +1) != 0){
 			//System.out.println("Document#: " + docCounter+ " Partition Key: " + k + " " +DocID.toString());
 			context.write(new IntWritable(currentPartition), new Text(docID_Classifier_Text.toString() + "\n"+feature_Set.toString()));
-		//	System.out.println(currentPartition+"\t"+docID_Classifier_Text.toString() + "\n"+feature_Set.toString());
+	//		System.out.println(currentPartition+"\t"+docID_Classifier_Text.toString() );//+ "\n"+feature_Set.toString());
 		}
-		else{
+		else if(currentPartition != 10){
 			context.write(new IntWritable(currentPartition), new Text(docID_Classifier_Text.toString() + "\n"+feature_Set.toString()));
-		//	System.out.println(currentPartition+"\t"+docID_Classifier_Text.toString() + "\n"+feature_Set.toString());
+		//	System.out.println(currentPartition+"\t"+docID_Classifier_Text.toString() );//+ "\n"+feature_Set.toString());
 			currentPartition++;
 		}
-
 
 
 		//	context.write(new IntWritable(randomGenerator.nextInt(10)), new Text(docID_Classifier_Text.toString() + "\t"+feature_Set.toString())); 

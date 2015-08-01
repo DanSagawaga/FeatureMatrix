@@ -13,6 +13,7 @@ public class NaturalKeyPartitioner extends Partitioner<CompositeKey, DoubleWrita
 	public int getPartition(CompositeKey key, DoubleWritable val, int numPartitions) {
 		int hash = key.getPrimaryKey().hashCode();
 		int partition = hash % numPartitions;
+		System.out.println("Natural Partitioner");
 		return partition;
 	}
 
