@@ -18,7 +18,7 @@ public class Job3_Reducer extends Reducer<CompositeKey,Text,Text,Text>{
 		String classifier = "", featureList = "";
 		int count = 0;
 		for(Text value: values){
-			if(count == 0){
+			if(count == 0){	//the first line holds the classifier
 				classifier = value.toString();
 				count++;
 			}
@@ -28,6 +28,9 @@ public class Job3_Reducer extends Reducer<CompositeKey,Text,Text,Text>{
 		
 	//	System.out.println(DocID.getPrimaryKey() + " " + classifier);
 	
+		if(featureList.toString().equals(""))
+			System.out.println("Document: "+ DocID.getPrimaryKey()+ " has 0 features | Has been ommited from matrix.");
+		else 
 		context.write(new Text(DocID.getPrimaryKey()+"\t"+classifier), new Text(featureList));
 		
 		
