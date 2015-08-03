@@ -25,6 +25,7 @@ import weka.classifiers.trees.DecisionStump;
 import weka.classifiers.trees.J48;
 import weka.classifiers.trees.REPTree;
 import weka.core.Attribute;
+import weka.core.FastVector;
 import weka.core.Instances;
 import weka.core.SparseInstance;
 
@@ -40,8 +41,10 @@ public class Job4_Reducer extends Reducer <IntWritable,Text,IntWritable,Text> {
 	static Instances dataset = null;
 	static int totalFeatures = 0;
 	static ArrayList<Attribute> attributes = new ArrayList<Attribute>();
+	FastVector<Attribute> fvWekaAttributes = new FastVector<Attribute>();
+
 	static Classifier[] models = { new J48(),new PART(),new DecisionTable(),new DecisionStump()
-	,new NaiveBayes(), new BayesNet(),new KStar(),new ZeroR(),new OneR(),new REPTree()};
+	,new J48(), new J48(),new KStar(),new ZeroR(),new OneR(),new REPTree()};
 	AggregateableEvaluation[] evals = new AggregateableEvaluation[10];
 	AggregateableEvaluation tempEval = null;
 
@@ -53,30 +56,45 @@ public class Job4_Reducer extends Reducer <IntWritable,Text,IntWritable,Text> {
 	public void setup(Context context) {
 		System.out.println("\n******** Processing Job 4 Reducer ********\n");
 		Configuration conf = context.getConfiguration();
+		totalFeatures = Integer.parseInt(conf.get("totalFeatures"));
 		String outputPath = conf.get("modelsPath");
 		/*
 		 * Creates Array of attributes to make into the instance data
 		 */
 		for(int k =0; k < totalFeatures + 1 ; k++)
-			attributes.add(new Attribute(""+k));
+			fvWekaAttributes.addElement(new Attribute("feature "+ k));
+
+			//attributes.add(new Attribute(""+k));
 
 		ArrayList<String> classifierList = new ArrayList<String>();
 		classifierList.add("Rec.Autos");
 		classifierList.add("talk.politics.mideast");
-		attributes.add(new Attribute("Classifiers",classifierList));	
+		//attributes.add(new Attribute("Classifiers",classifierList));	
+		FastVector fvNominalVal = new FastVector(2);
+		 fvNominalVal.addElement("Rec.Autos");
+		 fvNominalVal.addElement("talk.politics.mideast");
+		 //attributes.add( new Attribute("Document Class", fvNominalVal));
+		 fvWekaAttributes.addElement( new Attribute("Document Class", fvNominalVal));
 
 		try{
-			dataset = new Instances("FeatureInstance",attributes,totalFeatures+1);
-			dataset.setClassIndex(totalFeatures+1);
+			dataset = new Instances("FeatureInstance",fvWekaAttributes,totalFeatures+1); 		
+			dataset.setClassIndex(fvWekaAttributes.size()-1);
+			System.out.println(dataset.classAttribute().toString());
+			System.out.println(dataset.toSummaryString());
+
+		//	dataset = new Instances("FeatureInstance",attributes,totalFeatures+1);
+		//	dataset.setClassIndex(totalFeatures+1);
 
 			System.out.println("\nReading in Classifiers and Models\n");
 			//instantiates evaluation objects
 			for(int k=0; k < evals.length; k++){
 				models[k] = (Classifier) weka.core.SerializationHelper.read(outputPath+"Models/"+k+".model");
-				evals[k] = (AggregateableEvaluation) weka.core.SerializationHelper.read(outputPath+"Evaluations/"+k+".evaluation");
-				System.out.println("Classifier: "+k+" ACCURACY: "+evals[k].pctCorrect()+"%");
-
+				evals[k] = new AggregateableEvaluation(dataset);
+				//evals[k] = (AggregateableEvaluation) weka.core.SerializationHelper.read(outputPath+"Evaluations/"+k+".evaluation");
+				//System.out.println("Classifier: "+k+" ACCURACY: "+evals[k].pctCorrect()+"%");
 			}
+			models[1] = (PART) weka.core.SerializationHelper.read(outputPath+"Models/"+1+".model");
+			tempEval = new 	AggregateableEvaluation(dataset);
 			System.out.println("\nRead in Classifiers and Models Sucessfully\n");
 
 		}catch(Exception e){
@@ -100,58 +118,63 @@ public class Job4_Reducer extends Reducer <IntWritable,Text,IntWritable,Text> {
 		dataset.setClassIndex(totalFeatures+1);
 		//System.out.println(dataset.classIndex());
 
-			for (Text val : values) {
+		for (Text val : values) {
 
-				lines = val.toString().split("\n");
-				splitLine = lines[0].split("\t");
-				instanceClass = splitLine[1];
+			lines = val.toString().split("\n");
+			splitLine = lines[0].split("\t");
+			instanceClass = splitLine[1];
 
-				InstanceValues = new double[lines.length-1];
-				InstanceIndices = new int[lines.length-1];
+			InstanceValues = new double[lines.length-1];
+			InstanceIndices = new int[lines.length-1];
 
-				for(int k = 1; k < lines.length; k++){
-					splitLine = lines[k].split("\t");
-					InstanceIndices[k-1] = Integer.parseInt(splitLine[0]);
-					InstanceValues[k-1] = Double.parseDouble(splitLine[1]);
-				}
-
-				/*
-				 * Builds Instance Row From the Value in the Loop
-				 */
-				SparseInstance instanceRow = new SparseInstance(1.0,InstanceValues,InstanceIndices,totalFeatures + 1);
-				if(instanceClass.equals("rec.autos"))
-					instanceRow.setValue(totalFeatures+1, 0.5);
-				else	
-					instanceRow.setValue(totalFeatures+1, 1.0);
-
-				//		System.out.println(instanceRow.toString());
-
-				dataset.add(instanceRow);	
-                                                                          
+			for(int k = 1; k < lines.length; k++){
+				splitLine = lines[k].split("\t");
+				InstanceIndices[k-1] = Integer.parseInt(splitLine[0]);
+				InstanceValues[k-1] = Double.parseDouble(splitLine[1]);
 			}
+
 			/*
-			 * End of Iterable For loop 
+			 * Builds Instance Row From the Value in the Loop
 			 */
-			try{
-				for(int k = 0; k < key.get(); k++){
+			SparseInstance instanceRow = new SparseInstance(1.0,InstanceValues,InstanceIndices,totalFeatures + 1);
+			if(instanceClass.equals("rec.autos"))
+				instanceRow.setValue(totalFeatures+1, 0.5);
+			else	
+				instanceRow.setValue(totalFeatures+1, 1.0);
 
-					//	System.out.println("Classifier # " +(9-k)+ " Evaluating training Fold: "+ (9-key.get()));
-						tempEval = new AggregateableEvaluation(dataset);
-						tempEval.evaluateModel(models[9-k],dataset);
-						evals[9 - key.get()].aggregate(tempEval);
-					
+			//		System.out.println(instanceRow.toString());
+
+			dataset.add(instanceRow);	
+
+		}
+		/*
+		 * End of Iterable For loop 
+		 */
+		try{
+			for(int k = 0; k < models.length; k++){
+
+				if(k != key.get()){	//skips the classifier that trained on that fold from evaluating
+					tempEval = new AggregateableEvaluation(dataset);
+					tempEval.evaluateModel(models[k],dataset);
+					evals[k].aggregate(tempEval);
+					System.out.println("Classifier # " +(k)+ " | Evaluating fold: " +(key.get() +" | On "+dataset.numInstances()+" instances | "+" | ACCURACY: "+evals[k].pctCorrect()+"%"));
+					tempEval = null;
 				}
-			//	System.out.println();
-				dataset.delete();
-
-			}catch (Exception e){
-				e.printStackTrace();
 			}
+			dataset.delete();
+
+			//System.out.println("Buidling Classifier: " + key.get() + " on "+dataset.numInstances()+" instances.");
+
+			//	System.out.println();
+
+		}catch (Exception e){
+			e.printStackTrace();
+		}
 
 
-			System.out.println("Reducer Key: "+key.get());
-}
-	
+		System.out.println();
+	}
+
 
 	protected void cleanup(Context context) throws IOException, InterruptedException {
 		System.out.println("\nWriting out Classifier and Evaluations\n");

@@ -37,7 +37,7 @@ public class Job4_Mapper extends Mapper<Text, Text, IntWritable, Text>{
 		if(docCounter%(numDocsInFold +1) != 0){
 			//System.out.println("Document#: " + docCounter+ " Partition Key: " + k + " " +DocID.toString());
 			context.write(new IntWritable(currentPartition), new Text(docID_Classifier_Text.toString() + "\n"+feature_Set.toString()));
-	//		System.out.println(currentPartition+"\t"+docID_Classifier_Text.toString() );//+ "\n"+feature_Set.toString());
+		//	System.out.println(currentPartition+"\t"+docID_Classifier_Text.toString());//+ "\n"+feature_Set.toString());
 		}
 		else if(currentPartition != 10){
 			context.write(new IntWritable(currentPartition), new Text(docID_Classifier_Text.toString() + "\n"+feature_Set.toString()));

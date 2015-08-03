@@ -34,43 +34,50 @@ import java.nio.file.FileSystem;
 import weka.classifiers.trees.RandomTree; 
 import weka.classifiers.rules.ZeroR ;
 import weka.classifiers.trees.REPTree;
-
-
-
-
-
-
+import weka.core.FastVector;
 public class Job4_Combiner extends Reducer<IntWritable,Text,IntWritable,Text> {
 
 	static Instances dataset = null;
 	static int totalFeatures = 0;
 	static ArrayList<Attribute> attributes = new ArrayList<Attribute>();
 	static Classifier[] models = { new J48(),new PART(),new DecisionTable(),new DecisionStump()
-	,new NaiveBayes(), new BayesNet(),new KStar(),new ZeroR(),new OneR(),new REPTree()};
+	,new J48(), new BayesNet(),new KStar(),new ZeroR(),new OneR(),new REPTree()};
 //		new J48(),new PART(), new DecisionTable(),new DecisionStump(), //one-level decision tree
 //		new NaiveBayes(), new BayesNet()
 //		,new KStar(), new J48(), new LWL(), new ZeroR()		
 //	};
 	AggregateableEvaluation evals[] = new AggregateableEvaluation[models.length];
 	AggregateableEvaluation tempEval = null;
-
-
+	FastVector<Attribute> fvWekaAttributes = new FastVector<Attribute>();
+	 
 	public void setup(Context context){
 		System.out.println("\n******** Processing Job 4 Combiner ********\n");
+		Configuration conf = context.getConfiguration();
+		totalFeatures = Integer.parseInt(conf.get("totalFeatures"));
 		/*
 		 * Creates Array of attributes to make into the instance data
 		 */
-		for(int k =0; k < totalFeatures + 1 ; k++)
-			attributes.add(new Attribute(""+k));
+		String temp = null;
+		for(int k =0; k < totalFeatures; k++){
+			temp = k + " Feature";
+			fvWekaAttributes.addElement(new Attribute("feature "+ k));
+		//	attributes.add(new Attribute(temp,k));
+			}
 
-		ArrayList<String> classifierList = new ArrayList<String>();
+		List<String> classifierList = new ArrayList<String>();
 		classifierList.add("Rec.Autos");
 		classifierList.add("talk.politics.mideast");
-		attributes.add(new Attribute("Classifiers",classifierList));	
+		//attributes.add(new Attribute("Classifiers",classifierList));	
+		FastVector fvNominalVal = new FastVector(2);
+		 fvNominalVal.addElement("Rec.Autos");
+		 fvNominalVal.addElement("talk.politics.mideast");
+		// fvWekaAttributes.addElement( new Attribute("Document Class", fvNominalVal));
+		 fvWekaAttributes.addElement( new Attribute("Document Class", fvNominalVal));
 
 		try{
-			dataset = new Instances("FeatureInstance",attributes,totalFeatures+1);
-			dataset.setClassIndex(totalFeatures+1);
+			dataset = new Instances("FeatureInstance",fvWekaAttributes,totalFeatures+1); 		
+			dataset.setClassIndex(fvWekaAttributes.size()-1);
+			System.out.println(dataset.classAttribute().toString());
 			//instantiates evaluation objects
 			for(int k=0; k < evals.length; k++)
 				evals[k] = new AggregateableEvaluation(dataset);
@@ -88,7 +95,7 @@ public class Job4_Combiner extends Reducer<IntWritable,Text,IntWritable,Text> {
 		double[] InstanceValues = null;
 		int[] InstanceIndices = null;
 
-		dataset.setClassIndex(totalFeatures+1);
+		dataset.setClassIndex(fvWekaAttributes.size()-1);
 		//System.out.println(dataset.classIndex());
 
 		//if(key.get() == 0){
@@ -98,7 +105,7 @@ public class Job4_Combiner extends Reducer<IntWritable,Text,IntWritable,Text> {
 			splitLine = lines[0].split("\t");
 			instanceClass = splitLine[1];
 
-/*			lines[0] = "0";
+			lines[0] = "0";
 			Arrays.sort(lines, new Comparator<String>() {
 		        @Override
 		        public int compare(String o1, String o2) {
@@ -113,7 +120,7 @@ public class Job4_Combiner extends Reducer<IntWritable,Text,IntWritable,Text> {
 		        	else return 0;
 		        }
 		    });
-*/			
+		
 			//System.out.println(Arrays.toString(lines));
 			
 			InstanceValues = new double[lines.length-1];
@@ -134,19 +141,21 @@ public class Job4_Combiner extends Reducer<IntWritable,Text,IntWritable,Text> {
 			else	
 				instanceRow.setValue(totalFeatures+1, 1.0);
 
-			//	System.out.println(instanceRow.toString());
-
 			dataset.add(instanceRow);	
-			context.write(new IntWritable(9 -key.get()), new Text(val.toString()));
+			context.write(new IntWritable(key.get()), new Text(val.toString()));
 
 		}
 		/*
 		 * End of Iterable For loop 
 		 */
 		try{
-
+		//	System.out.println("Buidling Classifier: " + key.get() + " on "+dataset.numInstances()+" instances.");
 			models[key.get()].buildClassifier(dataset);
-			for(int k = 0; k < key.get(); k++){
+			//System.out.println(dataset.toSummaryString());
+
+			dataset.delete();
+
+	/*		for(int k = 0; k < key.get(); k++){
 
 				if(k == key.get()-1){
 					//If the dataset is evaluated from the previous trained model,
@@ -161,15 +170,14 @@ public class Job4_Combiner extends Reducer<IntWritable,Text,IntWritable,Text> {
 					evals[key.get()].aggregate(tempEval);
 				}
 			}
-			System.out.println();
-			dataset.delete();
+			*/
 
 
 		}catch (Exception e){
 			e.printStackTrace();
 		}
 		//	}
-		System.out.println("Combiner Key: "+key.get());
+		//System.out.println("Combiner Key: "+key.get());
 
 	}
 
@@ -182,12 +190,12 @@ public class Job4_Combiner extends Reducer<IntWritable,Text,IntWritable,Text> {
 		File EvaluationModelsDir = new File(outputPath+"Evaluations/");
 		EvaluationModelsDir.mkdirs();
 		
-		System.out.println("\nWriting out Classifier and Evaluations\n");
+		System.out.println("\nJob 4 Clean up | Writing out Classifier and Evaluations\n");
 		try{
 			for(int k = 0; k < models.length; k++){
-				System.out.println("Classifier: "+k+" ACCURACY: "+evals[k].pctCorrect()+"%");
+			//	System.out.println("Classifier: "+k+" ACCURACY: "+evals[k].pctCorrect()+"%");
 				weka.core.SerializationHelper.write(outputPath+"Models/"+k+".model", models[k]);
-				weka.core.SerializationHelper.write(outputPath+"Evaluations/"+k+".evaluation", evals[k]);
+			//	weka.core.SerializationHelper.write(outputPath+"Evaluations/"+k+".evaluation", evals[k]);
 
 			}
 			System.out.println("\nWrote out Classifiers and Evaluations sucessfully\n");
