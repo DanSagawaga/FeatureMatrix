@@ -38,7 +38,7 @@ public class HBaseRunner extends Configured implements Tool {
 
 	static long totalDocuments = 0, totalRecords = 0, totalFeatures = 0, startTime = 0, stopTime = 0, totalStartTime = 0, totalStopTime = 0;
 	static boolean jobsSuccess = false;
-	static int instanceSize = 0;
+	static int instanceSize = 0, numFolds = 10;
 	static boolean[] jobsToRun = {true,true,true,true};
 
 
@@ -55,7 +55,7 @@ public class HBaseRunner extends Configured implements Tool {
 			classMemPath = new Path(args[0]+"/class-memberships/class-memberships.seq");
 			outputPath = new Path(args[0]+"/TF_IDF/DocumentCounter");///home/cloudera/Documents/TF_IDF
 			outputPath2 = new Path(args[0]+"/TF_IDF/MatrixIntermediateFormat");// /home/cloudera/Documents/TF_IDF
-			outputPath3 = new Path(args[0]+"/TF_IDF/FinalMatrixFormat");///home/cloudera/Documents/TF_IDF
+			outputPath3 = new Path(args[0]+"/TF_IDF/MatrixTrainingFolds");///home/cloudera/Documents/TF_IDF
 			outputPath4 = new Path(args[0]+"/TF_IDF/ClassifierModels");///home/cloudera/Documents/TF_IDF
 			existingDirs[0] = new File(args[0] + "/TF_IDF");
 
@@ -81,12 +81,12 @@ public class HBaseRunner extends Configured implements Tool {
 		 * to pass to the next job
 		 */
 	    totalStartTime = System.currentTimeMillis();
+		Configuration conf = new Configuration();
 
 		if(jobsToRun[0]){
     	    startTime = System.currentTimeMillis();
 
-			Configuration conf = new Configuration();
-			conf.set("xtinputformat.record.delimiter","</features>");
+			//conf.set("xtinputformat.record.delimiter","</features>");
 
 			Job job1 = Job.getInstance(conf,"Document Counter Job");
 			job1.setJarByClass(HBaseRunner.class);
@@ -102,6 +102,8 @@ public class HBaseRunner extends Configured implements Tool {
 			FileOutputFormat.setOutputPath(job1, outputPath);
 			jobsSuccess = job1.waitForCompletion(true);
 			
+			conf.setLong("totalDocuments",totalDocuments);
+			
     	    stopTime = System.currentTimeMillis();
     	    System.out.println("********** Job 1 Done. Total Time (ms): " + (stopTime-startTime)+" **********");
 
@@ -116,13 +118,14 @@ public class HBaseRunner extends Configured implements Tool {
 		 * The output file consists of lines representing a value in the TFxIDF matrix
 		 * Each line will have the format of <Document ID, Feature Index, Feature Name, TFxIDF value>   
 		 */
+		
 		if(jobsToRun[1] && (totalDocuments > 0)){
     	    startTime = System.currentTimeMillis();
-			Configuration conf2 = new Configuration();
-			conf2.set("xtinputformat.record.delimiter","</features>");
-			conf2.set("totalDocuments",""+totalDocuments);
+		//conf	Configuration conf = new Configuration();
+			conf.set("xtinputformat.record.delimiter","</features>");
+			conf.set("totalDocuments",""+totalDocuments);
 
-			Job job2 = Job.getInstance(conf2,"Doc-Feature Matrix Job");
+			Job job2 = Job.getInstance(conf,"Doc-Feature Matrix Job");
 			job2.setJarByClass(HBaseRunner.class);
 			job2.setJobName("Doc-Feature Matrix Job");
 			job2.setInputFormatClass(SequenceFileInputFormat.class);
@@ -165,9 +168,8 @@ public class HBaseRunner extends Configured implements Tool {
 		if(jobsToRun[2]){
     	    startTime = System.currentTimeMillis();
 
-			Configuration conf3 = new Configuration();
-
-			Job job3 = Job.getInstance(conf3,"Matrix Output Post-Processing");
+			conf.setInt("numFolds", numFolds);
+			Job job3 = Job.getInstance(conf,"Matrix Output Post-Processing");
 
 			job3.setJarByClass(HBaseRunner.class);
 			job3.setJobName("Matrix Output Post-Processing");
@@ -192,11 +194,13 @@ public class HBaseRunner extends Configured implements Tool {
 			job3.setOutputValueClass(Text.class);
 			job3.setOutputFormatClass(SequenceFileOutputFormat.class);
 
-			//MultipleOutputs.addNamedOutput(job3, "FeatureIndexKeyText", TextOutputFormat.class, Text.class, DoubleWritable.class);
-			//MultipleOutputs.addNamedOutput(job3, "Seq",SequenceFileOutputFormat.class,Text.class, DoubleWritable.class);
+			for(int k = 0; k < numFolds; k++)
+			MultipleOutputs.addNamedOutput(job3, "MatrixTrainingFold"+k, SequenceFileOutputFormat.class, Text.class, Text.class);
+			
+			MultipleOutputs.addNamedOutput(job3, "FullMatrix", TextOutputFormat.class, Text.class, Text.class);
 
+			
 			FileOutputFormat.setOutputPath(job3, outputPath3);
-
 			SequenceFileOutputFormat.setOutputPath(job3,outputPath3);
 
 			jobsSuccess = job3.waitForCompletion(true);
@@ -213,25 +217,25 @@ public class HBaseRunner extends Configured implements Tool {
 		if(jobsToRun[3]){
     	    startTime = System.currentTimeMillis();
 
-			Configuration conf4 = new Configuration();
-			totalDocuments = 197;
-			instanceSize = 200;
-			conf4.setLong("totalDocuments", totalDocuments);
-			conf4.setLong("totalFeatures", 2180);
-			conf4.setInt("instanceSize", instanceSize);
-			conf4.set("modelsPath", args[0]+"/TF_IDF/ClassifierModels/");
+			conf.setLong("totalFeatures", 2180);
+			conf.set("modelsPath", args[0]+"/TF_IDF/ClassifierModels/");
 
-			Job job4 = Job.getInstance(conf4,"Nth Split Cross Validation"); 
+			Job job4 = Job.getInstance(conf,"Nth Split Cross Validation"); 
 
 			job4.setJarByClass(HBaseRunner.class);
 			job4.setJobName("Nth Split Cross Validation");
 
 			job4.setInputFormatClass(SequenceFileInputFormat.class);
-			job4.setMapperClass(Job4_Mapper.class);
+		//	job4.setMapperClass(Job4_Mapper.class);
+			for(int k = 0; k < numFolds; k++)
+			MultipleInputs.addInputPath(job4, new Path (outputPath3 + "/MatrixTrainingFold"+k+"-r-00000"), SequenceFileInputFormat.class, Job4_Mapper.class);
+
+			
 			job4.setMapOutputKeyClass(IntWritable.class);
 			job4.setMapOutputValueClass(Text.class);
-			job4.setCombinerClass(Job4_Combiner.class);
-			job4.setReducerClass(Job4_Reducer.class);
+			job4.setNumReduceTasks(0);
+		//	job4.setCombinerClass(Job4_Combiner.class);
+		//	job4.setReducerClass(Job4_Reducer.class);
 			//job4.setNumReduceTasks(10);
 
 			SequenceFileInputFormat.addInputPath(job4, outputPath3);
