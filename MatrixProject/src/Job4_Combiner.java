@@ -5,6 +5,7 @@ import java.util.*;
 import org.apache.hadoop.io.DoubleWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.Reducer.Context;
 import org.apache.hadoop.mapreduce.lib.output.MultipleOutputs;
 import org.apache.hadoop.io.IntWritable;
@@ -38,75 +39,46 @@ import weka.classifiers.trees.REPTree;
 import weka.core.FastVector;
 public class Job4_Combiner extends Reducer<IntWritable,Text,IntWritable,Text> {
 
-	static Instances dataset = null, tempSet = null;
-	static int totalFeatures = 0;
-	static FastVector<Attribute> fvWekaAttributes = new FastVector<Attribute>();
-	String outputPath = null;
-	static Classifier[] models = { new J48(),new PART(),new DecisionTable(),new DecisionStump()
-	,new NaiveBayes(), new BayesNet(),new KStar(),new ZeroR(),new OneR(),new REPTree()};
-
-	AggregateableEvaluation tempEval = null;
+	int combinerNum = 0;
 
 	public void setup(Context context){
-		System.out.println("\n******** Processing Job 4 Combiner ********\n");
-
-		Configuration conf = context.getConfiguration();
-		totalFeatures = Integer.parseInt(conf.get("totalFeatures"));
-		outputPath = conf.get("modelsPath");
 		
-		File ClassifierModelsDir = new File(outputPath+"Models/");
-		ClassifierModelsDir.mkdirs();
-		/*
-		 * Creates Array of attributes to make into the instance data
-		 */
-		for(int k =0; k < totalFeatures; k++)
-			fvWekaAttributes.addElement(new Attribute("Feature "+ k));
+		TaskAttemptID tid = context.getTaskAttemptID();		
+		String[] splitter = tid.toString().split("_");
+		combinerNum = Integer.parseInt(splitter[4]);
+		
+		System.out.println("\n******** Processing Job 4 Combiner " +splitter[4]+" ********\n");
 
-
-		FastVector fvNominalVal = new FastVector(2);
-		fvNominalVal.addElement("Rec.Autos");
-		fvNominalVal.addElement("talk.politics.mideast");
-
-		fvWekaAttributes.addElement( new Attribute("Class Attribute", fvNominalVal));
-
-		System.out.println("Instance Vector Size: " + fvWekaAttributes.size());
-
-		try{
-			dataset = new Instances("FeatureInstance",fvWekaAttributes,fvWekaAttributes.size()-1); 	
-			tempSet = new Instances(dataset);
-
-			dataset.setClassIndex(fvWekaAttributes.size()-1);
-			System.out.println(dataset.classAttribute().toString());
-			//instantiates evaluation objects
-			//	System.out.println(dataset.toSummaryString());
-
-		}catch(Exception e){
-			e.printStackTrace();
-		}
+		
+		if(combinerNum == 0)
+			combinerNum = 1;
+		
 	}
 
 
 	public void reduce(IntWritable key, Iterable<Text> values,  Context context) throws IOException, InterruptedException {
 
+		int count = 0;
+	//	System.out.println("Reducer: " + key.get());
+		
 		String[] lines = null, splitLine = null; 
 		String instanceClass = null;
-		
+
 		double[] InstanceValues = null;
 		int[] InstanceIndices = null;
 
-		dataset.setClassIndex(fvWekaAttributes.size()-1);
 		//System.out.println(dataset.classIndex());
 
 		//if(key.get() == 0){
 		for (Text val : values) {
-
+			count++;
 			lines = val.toString().split("\n");
 			splitLine = lines[0].split("\t");
 			instanceClass = splitLine[1];
 
-			
+
 			lines[0] = "-1";
-			
+
 			Arrays.sort(lines, new Comparator<String>() {
 				@Override
 				public int compare(String par1, String par2) {
@@ -128,58 +100,19 @@ public class Job4_Combiner extends Reducer<IntWritable,Text,IntWritable,Text> {
 				InstanceValues[k-1] = Double.parseDouble(splitLine[1]);
 			}
 
-			/*
-			 * Builds Instance Row From the Value in the Loop
-			 */
-			SparseInstance instanceRow = new SparseInstance(1.0,InstanceValues,InstanceIndices,fvWekaAttributes.size()-1);
-			if(instanceClass.equals("rec.autos"))
-				instanceRow.setValue(fvWekaAttributes.size()-1, 0.5);
-			else	
-				instanceRow.setValue(fvWekaAttributes.size()-1, 1.0);
-
-			dataset.add(instanceRow);	
-		//	tempSet.add(instanceRow);
-
-			context.write(new IntWritable(key.get()), new Text(val.toString()));
 
 		}
-		/*
-		 * End of Iterable For loop 
-		 */
-		try{
-		//	System.out.println("Buidling Classifier: " + key.get() + " on "+dataset.numInstances()+" instances.");
-			models[key.get()].buildClassifier(dataset);
-			//System.out.println("Classifier: " + key.get()+ " " +models[key.get()].toSummaryString());
-			weka.core.SerializationHelper.write(outputPath+"Models/"+key.get()+".model", models[key.get()]);
-			weka.core.SerializationHelper.write("/home/cloudera/Desktop/tempModels/"+key.get()+".model", models[key.get()]);
-			//System.out.println(dataset.toString());
-			dataset.delete();
-
-
-
-		}catch (Exception e){
-			e.printStackTrace();
-		}
-
+		System.out.println("Reducer Partition: " + key.get()+" contains: "+ count+" instances");
+		count = 0;
 	}
 
 
 	protected void cleanup(Context context) throws IOException, InterruptedException {
 
-	//	System.out.println(tempSet.toString());
-
-
-		
-		File EvaluationModelsDir = new File(outputPath+"Evaluations/");
-		EvaluationModelsDir.mkdirs();
-
-	
-			//System.out.println(tempDataset.toString());
 
 
 	}
 
+
 }
-
-
 
