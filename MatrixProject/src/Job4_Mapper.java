@@ -36,7 +36,7 @@ import weka.core.SparseInstance;
 public class Job4_Mapper extends Mapper<Text, Text, IntWritable, Text>{
 
 	public enum Job4_Mapper_Counter { LINES }
-	public int totalDocuments = 0, mapperNum = 0, totalFeatures = 0;
+	public int totalDocuments = 0, mapperNum = 0, totalFeatures = 0,numFolds = 0;
 	FastVector<Attribute> fvWekaAttributes = new FastVector<Attribute>();
 	static Instances dataset = null, tempSet = null;
 
@@ -49,6 +49,9 @@ public class Job4_Mapper extends Mapper<Text, Text, IntWritable, Text>{
 	public void setup(Context context) {
 		Configuration conf = context.getConfiguration();
 		totalFeatures = Integer.parseInt(conf.get("totalFeatures"));
+		totalDocuments= Integer.parseInt(conf.get("totalDocuments"));
+		numFolds = Integer.parseInt(conf.get("numFolds"));
+		
 		TaskAttemptID tid = context.getTaskAttemptID();		
 		String[] splitter = tid.toString().split("_");
 		mapperNum = Integer.parseInt(splitter[4]);
@@ -63,7 +66,7 @@ public class Job4_Mapper extends Mapper<Text, Text, IntWritable, Text>{
 			fvWekaAttributes.addElement(new Attribute("Feature "+ k));
 
 
-		FastVector fvNominalVal = new FastVector(2);
+		FastVector<String> fvNominalVal = new FastVector<String>(2);
 		fvNominalVal.addElement("Rec.Autos");
 		fvNominalVal.addElement("talk.politics.mideast");
 
@@ -131,8 +134,9 @@ public class Job4_Mapper extends Mapper<Text, Text, IntWritable, Text>{
 			instanceRow.setValue(fvWekaAttributes.size()-1, 1.0);
 
 		dataset.add(instanceRow);	
-
-		//		context.write(new IntWritable(currentPartition), new Text(docID_Classifier_Text.toString() + "\n"+feature_Set.toString()));
+		
+		if((int)((totalDocuments/numFolds)* numFolds-1)% 0 == 0)
+		context.write(new IntWritable(currentPartition), new Text(docID_Class_Text.toString() + "\n"+feature_Set.toString()));
 
 	}
 	protected void cleanup(Context context) throws IOException, InterruptedException {
@@ -154,5 +158,6 @@ public class Job4_Mapper extends Mapper<Text, Text, IntWritable, Text>{
 			}catch (Exception e){
 				e.printStackTrace();
 			}
+		System.out.println(context.getCounter(Job4_Mapper_Counter.LINES).getValue());
 	}
 }
