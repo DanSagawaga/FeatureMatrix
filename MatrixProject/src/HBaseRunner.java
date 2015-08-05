@@ -66,7 +66,7 @@ public class HBaseRunner extends Configured implements Tool {
 
 
 			for(int k = 2; k < args.length; k++)
-				parClassifiers += args[k]+ " ";
+				parClassifiers += args[k]+ ",";
 
 			if(numFolds < 2){
 				System.out.println("Number of folds must be greater than 2!");
@@ -262,12 +262,14 @@ public class HBaseRunner extends Configured implements Tool {
 
 			job4.setMapOutputKeyClass(IntWritable.class);
 			job4.setMapOutputValueClass(Text.class);
-		//	job4.setNumReduceTasks(0);
+			//job4.setNumReduceTasks(0);
 			//	job4.setCombinerClass(Job4_Combiner.class);
 			job4.setReducerClass(Job4_Reducer.class);
 			job4.setNumReduceTasks(numFolds);
 
 			SequenceFileInputFormat.addInputPath(job4, outputPath3);
+			
+			job4.setOutputFormatClass(TextOutputFormat.class);
 			FileOutputFormat.setOutputPath(job4, outputPath4);
 
 			//	MultipleOutputs.addNamedOutput(job4, "MatrixFold0",TextOutputFormat.class,Text.class, Text.class);

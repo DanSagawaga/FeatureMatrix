@@ -12,6 +12,7 @@ import org.apache.hadoop.mapreduce.lib.output.MultipleOutputs;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.conf.Configuration;
 
+import weka.classifiers.Evaluation;
 import weka.classifiers.AggregateableEvaluation;
 import weka.classifiers.Classifier;
 import weka.classifiers.bayes.BayesNet;
@@ -39,12 +40,13 @@ import weka.classifiers.AggregateableEvaluation;
 import weka.classifiers.Evaluation;
 
 
-public class Job4_Reducer extends Reducer <IntWritable,Text,IntWritable,Text> {
+public class Job4_Reducer extends Reducer <IntWritable,Text,Text,Text> {
 
 	static String reducerClassifierStr = null, outputPath = null;
 	static Classifier reducerClassifier = null;
-	static int reducerNum = 0, totalFeatures = 0, tempCount = 0;
-	AggregateableEvaluation eval = null, tempEval = null;
+	static int reducerNum = 0, totalFeatures = 0 ;
+	AggregateableEvaluation eval = null;
+	Evaluation tempEval = null;
 
 	static Instances dataset = null, tempSet = null;
 
@@ -56,7 +58,7 @@ public class Job4_Reducer extends Reducer <IntWritable,Text,IntWritable,Text> {
 		String[] splitter = tid.toString().split("_");
 		reducerNum = Integer.parseInt(splitter[4]);
 
-		System.out.println("\n******** Processing Job 4 Reducer: "+reducerNum+ " ********\n");
+		System.out.println("\n****************** Processing Job 4 Reducer: "+reducerNum+ " ******************\n");
 
 		Configuration conf = context.getConfiguration();
 		outputPath = conf.get("modelsPath");
@@ -100,6 +102,8 @@ public class Job4_Reducer extends Reducer <IntWritable,Text,IntWritable,Text> {
 
 	public void reduce(IntWritable key, Iterable<Text> values, Context context)throws IOException , InterruptedException{
 
+		int tempCount = 0;
+		
 		System.out.println("Reducer Key" + key.toString());
 
 		String[] lines = null, splitLine = null; 
@@ -151,15 +155,24 @@ public class Job4_Reducer extends Reducer <IntWritable,Text,IntWritable,Text> {
  			else	
  				instanceRow.setValue(fvWekaAttributes.size()-1, 1.0);
 			
- 			dataset.add(instanceRow);	
+ 			dataset.add(instanceRow);
+ 			try{
+ 			tempEval = new Evaluation(dataset);
+ 			tempEval.evaluateModel(reducerClassifier, dataset);
+ 			eval.aggregate(tempEval);
+ 			
+ 			dataset.delete();
+ 			}catch(Exception e){
+ 				e.printStackTrace();
+ 			}
  		
  		//	context.write(new IntWritable(key.get()), new Text(val.toString()));
  			
 		}
 
-	//	if(reducerNum == 0)
+	//	if(reducerNum == 9)
 	//	System.out.println(dataset.toString());
-		System.out.println(tempCount);
+	//	System.out.println(tempCount);
 
 	}
 
@@ -167,12 +180,21 @@ public class Job4_Reducer extends Reducer <IntWritable,Text,IntWritable,Text> {
 
 	protected void cleanup(Context context) throws IOException, InterruptedException {
 
-	//	System.out.println("\nCount" + count);
+		try{
+		System.out.println("\nEvaluation for Model: " + reducerClassifier.getClass().getSimpleName() + " | "+ eval.pctCorrect());
+		context.write(new Text("Model "+ reducerClassifier.getClass().getSimpleName() + 
+				"\nPrct Correct\t" + eval.pctCorrect()+
+				"\nPrct Incorrect\t" + eval.pctIncorrect()+
+				"\nEvaluated on\t" +eval.numInstances()+ " Instances\n\n"), 
+				new Text(eval.toMatrixString() ));
+		}catch(Exception e){
+			e.printStackTrace();
+		}
 
 	}
 
 	private String getReducerClassifierName(String par){
-		String splitter[] = par.split(" ");
+		String splitter[] = par.split(",");
 		return splitter[reducerNum];
 
 	}

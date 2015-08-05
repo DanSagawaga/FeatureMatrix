@@ -44,9 +44,13 @@ public class Job3_Reducer extends Reducer<CompositeKey,Text,Text,Text>{
 			else
 				featureList +=  value.toString() + "\n";
 		}
+		
+	//	System.out.println("Document: "+ DocID.getPrimaryKey());
 
-		if(featureList.toString().equals(""))
+
+		if(featureList.toString().equals("")){
 			System.out.println("Document: "+ DocID.getPrimaryKey()+ " has 0 features | Has been ommited from matrix.");
+		}
 		/*
 		 * Partitions the matrix into n test folds. 
 		 */
@@ -59,7 +63,8 @@ public class Job3_Reducer extends Reducer<CompositeKey,Text,Text,Text>{
 			if(currentPartition < numFolds){
 				for(int k = 0; k < numFolds; k++){
 					if(k != currentPartition){
-						mos.write("MatrixTrainingFold"+currentPartition,new Text(DocID.getPrimaryKey()+"\t"+classifier), new Text(featureList));
+						mos.write("MatrixTrainingFold"+k,new Text(DocID.getPrimaryKey()+"\t"+classifier), new Text(featureList));
+						//System.out.println(numFolds+" were created");
 						foldDocCount[k]++;
 					}
 				}

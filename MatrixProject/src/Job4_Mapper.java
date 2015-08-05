@@ -36,7 +36,7 @@ public class Job4_Mapper extends Mapper<Text, Text, IntWritable, Text>{
     enum Job4_Mapper_Counter { LINES }
 	FastVector<Attribute> fvWekaAttributes = new FastVector<Attribute>();
 
-    static int totalDocuments = 0, mapperNum = 0, totalFeatures = 0,numFolds = 0, numDocsInFold = 0, currentPartition = 0, mapperClassifierIndex = 0, tempCount = 0;;
+    int totalDocuments = 0, mapperNum = 0, totalFeatures = 0,numFolds = 0, numDocsInFold = 0, currentPartition = 0, mapperClassifierIndex = 0, tempCount = 0;;
 	int[] mapWriteCount = new int[10];
 	
 	static String outputPath = null, mapperClassifierStr = null;
@@ -60,13 +60,13 @@ public class Job4_Mapper extends Mapper<Text, Text, IntWritable, Text>{
 		numDocsInFold = (int)(totalDocuments/numFolds);
 		
 		mapperClassifierStr = conf.get("parClassifiers");
-		mapperClassifierIndex = getClassifierIndex(mapperClassifierStr);
+		mapperClassifierIndex = getClassifierIndex(mapperClassifierStr, mapperNum);
 		
 
 		if(mapperNum == 0)
 			currentPartition = 1;
 
-		System.out.println("\n******** Processing Job 4 Mapper: "+mapperNum+ " ********\n");
+		System.out.println("\n****************** Processing Job 4 Mapper: "+mapperNum+ " ******************\n");
 
 
 		/*
@@ -209,10 +209,10 @@ public class Job4_Mapper extends Mapper<Text, Text, IntWritable, Text>{
 	//	System.out.println(context.getCounter(Job4_Mapper_Counter.LINES).getValue());
 	}
 	
-	public static int getClassifierIndex(String classifierPar){
+	public static int getClassifierIndex(String classifierPar, int mapperNumPar){
 		int index = -1;
-		String splitter[] = classifierPar.split(" ");
-		mapperClassifierStr = splitter[mapperNum];
+		String splitter[] = classifierPar.split(",");
+		mapperClassifierStr = splitter[mapperNumPar];
 		
 		for(int k = 0; k < models.length; k++){
 			if(mapperClassifierStr.equals(models[k].getClass().getSimpleName()))
