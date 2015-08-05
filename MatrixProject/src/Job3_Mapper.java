@@ -10,7 +10,7 @@ import org.apache.hadoop.mapreduce.Mapper.Context;
 import org.jdom2.Document;
 import org.jdom2.Element;
 import org.jdom2.input.SAXBuilder;
-import org.apache.hadoop.io.WritableComparable;
+import org.apache.hadoop.io.WritableComparable; 
 
 import java.util.*;
 

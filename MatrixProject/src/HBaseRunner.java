@@ -1,4 +1,4 @@
-import java.io.IOException;
+import java.io.*;
 import java.util.*;
 
 import org.apache.hadoop.fs.FileSystem;
@@ -48,24 +48,25 @@ public class HBaseRunner extends Configured implements Tool {
 	static File existingDirs[] = new File[1];
 
 	static boolean jobsSuccess = false;
-	static boolean[] jobsToRun = {true,true,true,true};
+	static boolean[] jobsToRun = {false,false,false,false};
 
-	static int instanceSize = 0, numFolds = 0;
+	static int instanceSize = 0, numFolds = 0, numClasses = 0;
 	static long totalDocuments = 0, totalRecords = 0, totalFeatures = 0, startTime = 0, stopTime = 0, totalStartTime = 0, totalStopTime = 0;
 
 	static Classifier[] models = { new J48(),new PART(),new DecisionTable(),new DecisionStump() ,new NaiveBayes(), new BayesNet(),new KStar(),new ZeroR(),new OneR(),new REPTree()};
 
-	static String parClassifiers = "";
+	static String parClassifiers = "", docClasses = "";
 
 
 
 	public static void main(String[] args) {
-		
+
 		try{
 			numFolds = Integer.parseInt(args[1]);
+			numClasses = Integer.parseInt(args[2]);
 
 
-			for(int k = 2; k < args.length; k++)
+			for(int k = 3; k < args.length; k++)
 				parClassifiers += args[k]+ ",";
 
 			if(numFolds < 2){
@@ -73,7 +74,7 @@ public class HBaseRunner extends Configured implements Tool {
 				System.out.println("Ending Program.");
 				System.exit(-1);
 			}
-			if(numFolds != args.length -2){
+			if(numFolds != args.length -3){
 				System.out.println("Number of folds must equal number of classifiers");
 				System.out.println("Ending Program.");
 				System.exit(-1);
@@ -86,7 +87,8 @@ public class HBaseRunner extends Configured implements Tool {
 			 */
 			initPaths(args);
 			//Recursively deletes exisiting output directories
-			deleteDirs(existingDirs);
+			pickBestModel();
+			//	deleteDirs(existingDirs);
 
 			ToolRunner.run(new Configuration(), new HBaseRunner(), args);
 
@@ -226,6 +228,8 @@ public class HBaseRunner extends Configured implements Tool {
 				MultipleOutputs.addNamedOutput(job3, "MatrixTrainingFold"+k, SequenceFileOutputFormat.class, Text.class, Text.class);
 
 			MultipleOutputs.addNamedOutput(job3, "FullMatrix", TextOutputFormat.class, Text.class, Text.class);
+			MultipleOutputs.addNamedOutput(job3, "DocumentClasses", TextOutputFormat.class, Text.class, Text.class);
+
 
 
 			FileOutputFormat.setOutputPath(job3, outputPath3);
@@ -243,11 +247,19 @@ public class HBaseRunner extends Configured implements Tool {
 		 */
 
 		if(jobsToRun[3]){
+
+			/*
+			 * readDocumentClasses reads in the different document classes from output file into a string to pass to job 4 
+			 */
+			docClasses = readDocumentClasses();
+
 			startTime = System.currentTimeMillis();
 
 			conf.setLong("totalFeatures", 2180);
 			conf.set("modelsPath", args[0]+"/TF_IDF/ClassifierModels/");
 			conf.set("parClassifiers", parClassifiers);
+			conf.setInt("numClasses", numClasses);
+			conf.set("docClasses",docClasses);
 
 			Job job4 = Job.getInstance(conf,"Nth Split Cross Validation"); 
 
@@ -255,7 +267,7 @@ public class HBaseRunner extends Configured implements Tool {
 			job4.setJobName("Nth Split Cross Validation");
 
 			job4.setInputFormatClass(SequenceFileInputFormat.class);
-			//	job4.setMapperClass(Job4_Mapper.class);
+
 			for(int k = 0; k < numFolds; k++)
 				MultipleInputs.addInputPath(job4, new Path (outputPath3 + "/MatrixTrainingFold"+k+"-r-00000"), SequenceFileInputFormat.class, Job4_Mapper.class);
 
@@ -263,18 +275,16 @@ public class HBaseRunner extends Configured implements Tool {
 			job4.setMapOutputKeyClass(IntWritable.class);
 			job4.setMapOutputValueClass(Text.class);
 			//job4.setNumReduceTasks(0);
-			//	job4.setCombinerClass(Job4_Combiner.class);
 			job4.setReducerClass(Job4_Reducer.class);
 			job4.setNumReduceTasks(numFolds);
 
 			SequenceFileInputFormat.addInputPath(job4, outputPath3);
-			
+
 			job4.setOutputFormatClass(TextOutputFormat.class);
 			FileOutputFormat.setOutputPath(job4, outputPath4);
 
 			//	MultipleOutputs.addNamedOutput(job4, "MatrixFold0",TextOutputFormat.class,Text.class, Text.class);
 			//	MultipleOutputs.addNamedOutput(job4, "MatrixFold1",TextOutputFormat.class,Text.class, Text.class);
-
 
 			jobsSuccess = job4.waitForCompletion(true);
 			stopTime = System.currentTimeMillis();
@@ -294,8 +304,72 @@ public class HBaseRunner extends Configured implements Tool {
 	}
 
 
+	public static void pickBestModel(){
+		System.out.println("Selecting best Model...");
 
-	
+		//	double[] modelPercents = new double[numFolds];
+		double[] modelPercents = new double[10];
+		String[] modelNames = new String[10];
+		int tempCount = 0;
+		double max = 0;
+
+		try{
+			File dir = new File(outputPath4.toString());
+
+			for (File file : dir.listFiles()) {
+				if(file.isFile() && !file.isHidden()){
+					String fileName = file.getName();
+					String[] splitter = fileName.split("-");
+					if(splitter[0].equals("part")){
+						Scanner scan = new Scanner(file);
+						if(scan.hasNext()){
+							modelNames[tempCount] = scan.nextLine();
+							splitter = scan.nextLine().split("\t");
+							modelPercents[tempCount] = Double.parseDouble(splitter[1]);
+							System.out.println(splitter[1]);
+						}
+						tempCount++;
+						scan.close();
+					}
+				}
+			}
+
+		}catch(Exception e){
+			e.printStackTrace();
+		}
+		
+		for(int k = 0; k < modelPercents.length; k++){
+			if(modelPercents[k] > max)
+				max = modelPercents[k];
+		}
+
+	}
+
+	public static String readDocumentClasses() throws IOException{
+		System.out.println("Reading in document Classes...");
+		BufferedReader br = new BufferedReader(new FileReader(outputPath3.toString()+"/DocumentClasses-r-00000"));
+		String line = "";
+		StringBuilder sb = null;
+		try {
+			sb = new StringBuilder();
+			line = br.readLine();
+
+			while (line != null) {
+				sb.append(line);
+				sb.append(System.lineSeparator());
+				line = br.readLine();
+			}
+
+		} catch(Exception e) {
+			System.out.println("ERROR: Could not read document classes from file: " + outputPath3.toString()+"/DocumentClasses-r-00000");
+			e.printStackTrace();
+			System.out.println("Ending Program.");
+			System.exit(-1);
+		}
+		System.out.println("Succesfully read in document Classes...");
+		return sb.toString();
+	}
+
 	public static void initPaths(String[] args){
 		docFreqPath = new Path(args[0]+"/feature-sets/ne_all/docfreqs/part-00000");//home/cloudera/Desktop/2-100/feature-sets/ne_all/docfreqs/part-00000			
 		featureSetPath = new Path(args[0]+"feature-sets/ne_all/docfeaturesets-weighted/part-00000");//home/cloudera/Desktop/2-100/feature-sets/ne_all/docfeaturesets-weighted/part-00000

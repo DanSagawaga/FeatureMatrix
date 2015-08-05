@@ -9,9 +9,6 @@ import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Mapper.Context;
-import org.jdom2.Document;
-import org.jdom2.Element;
-import org.jdom2.input.SAXBuilder;
 import org.apache.hadoop.io.WritableComparable;
 import java.util.*;
 
@@ -35,11 +32,13 @@ public class Job4_Mapper extends Mapper<Text, Text, IntWritable, Text>{
 
     enum Job4_Mapper_Counter { LINES }
 	FastVector<Attribute> fvWekaAttributes = new FastVector<Attribute>();
+	FastVector<String> classNominalVal = null;
+	HashMap<String,Double> classNominalMap = null;
 
     int totalDocuments = 0, mapperNum = 0, totalFeatures = 0,numFolds = 0, numDocsInFold = 0, currentPartition = 0, mapperClassifierIndex = 0, tempCount = 0;;
 	int[] mapWriteCount = new int[10];
 	
-	static String outputPath = null, mapperClassifierStr = null;
+	static String outputPath = null, mapperClassifierStr = null, docClasses = null;
 	long docCounter = 0;
 	
 	static Instances dataset = null, tempSet = null;
@@ -54,6 +53,7 @@ public class Job4_Mapper extends Mapper<Text, Text, IntWritable, Text>{
 		
 		
 		Configuration conf = context.getConfiguration();
+		docClasses = conf.get("docClasses");
 		totalFeatures = Integer.parseInt(conf.get("totalFeatures"));
 		totalDocuments= Integer.parseInt(conf.get("totalDocuments"));
 		numFolds = Integer.parseInt(conf.get("numFolds"));
@@ -75,18 +75,26 @@ public class Job4_Mapper extends Mapper<Text, Text, IntWritable, Text>{
 		for(int k =0; k < totalFeatures; k++)
 			fvWekaAttributes.addElement(new Attribute("Feature "+ k));
 
+		splitter = docClasses.split("\n");
+		classNominalVal = new FastVector<String>(splitter.length);
+		classNominalMap = new HashMap<String,Double>(splitter.length);
+		/*
+		 * populates FastVector list to add as class attribute to the dataset
+		 * populates HashMap to compare each document's class 
+		 */
+		for(int k = 0; k < splitter.length; k++){
+		classNominalVal.addElement(splitter[k].trim());
+		classNominalMap.put(splitter[k].trim(), 1.0 / (k+1.0));
+		System.out.println(classNominalMap.get(splitter[k].trim()));
+		}
 
-		FastVector<String> fvNominalVal = new FastVector<String>(2);
-		fvNominalVal.addElement("Rec.Autos");
-		fvNominalVal.addElement("talk.politics.mideast");
-
-		fvWekaAttributes.addElement( new Attribute("Class Attribute", fvNominalVal));
+		fvWekaAttributes.addElement( new Attribute("Class Attribute", classNominalVal));
 		try{
 			dataset = new Instances("FeatureInstance",fvWekaAttributes,fvWekaAttributes.size()-1); 	
-			tempSet = new Instances(dataset);
+			//tempSet = new Instances(dataset);
 
 			dataset.setClassIndex(fvWekaAttributes.size()-1);
-	//		System.out.println(dataset.classAttribute().toString());
+			System.out.println(dataset.classAttribute().toString());
 			//	System.out.println(dataset.toSummaryString());
 
 		}catch(Exception e){
@@ -141,11 +149,14 @@ public class Job4_Mapper extends Mapper<Text, Text, IntWritable, Text>{
 		 * Builds Instance Row From the Value in the Loop
 		 */
 		SparseInstance instanceRow = new SparseInstance(1.0,InstanceValues,InstanceIndices,fvWekaAttributes.size()-1);
+		
+		instanceRow.setValue(fvWekaAttributes.size()-1, classNominalMap.get(instanceClass));
+/*	
 		if(instanceClass.equals("rec.autos"))
 			instanceRow.setValue(fvWekaAttributes.size()-1, 0.5);
 		else	
 			instanceRow.setValue(fvWekaAttributes.size()-1, 1.0);
-
+*/
 		dataset.add(instanceRow);	
 
 		/*

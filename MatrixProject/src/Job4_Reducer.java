@@ -2,7 +2,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.Vector;
 
+import org.apache.commons.lang.ArrayUtils;
 import org.apache.hadoop.io.DoubleWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Reducer;
@@ -31,9 +34,6 @@ import weka.core.Attribute;
 import weka.core.FastVector;
 import weka.core.Instances;
 import weka.core.SparseInstance;
-
-import com.google.inject.Key;
-
 import org.apache.hadoop.mapreduce.lib.output.MultipleOutputs;
 
 import weka.classifiers.AggregateableEvaluation;
@@ -42,15 +42,18 @@ import weka.classifiers.Evaluation;
 
 public class Job4_Reducer extends Reducer <IntWritable,Text,Text,Text> {
 
-	static String reducerClassifierStr = null, outputPath = null;
+	static String reducerClassifierStr = null, outputPath = null, docClasses = null;
 	static Classifier reducerClassifier = null;
-	static int reducerNum = 0, totalFeatures = 0 ;
+	static int reducerNum = 0, totalFeatures = 0, numClasses = 0;
 	AggregateableEvaluation eval = null;
 	Evaluation tempEval = null;
 
 	static Instances dataset = null, tempSet = null;
 
 	FastVector<Attribute> fvWekaAttributes = new FastVector<Attribute>();
+	FastVector<String> classNominalVal = null;
+	HashMap<String,Double> classNominalMap = null;
+
 
 
 	public void setup(Context context) {
@@ -62,8 +65,13 @@ public class Job4_Reducer extends Reducer <IntWritable,Text,Text,Text> {
 
 		Configuration conf = context.getConfiguration();
 		outputPath = conf.get("modelsPath");
-		totalFeatures = Integer.parseInt(conf.get("totalFeatures"));
+		docClasses = conf.get("docClasses");
+
 		reducerClassifierStr = conf.get("parClassifiers");
+
+		numClasses = Integer.parseInt(conf.get("numClasses"));
+		totalFeatures = Integer.parseInt(conf.get("totalFeatures"));
+
 		reducerClassifierStr = getReducerClassifierName(reducerClassifierStr);
 
 		try{
@@ -80,16 +88,28 @@ public class Job4_Reducer extends Reducer <IntWritable,Text,Text,Text> {
 			fvWekaAttributes.addElement(new Attribute("Feature "+ k));
 
 
-		FastVector<String> fvNominalVal = new FastVector<String>(2);
-		fvNominalVal.addElement("Rec.Autos");
-		fvNominalVal.addElement("talk.politics.mideast");
+		splitter = docClasses.split("\n");
+		classNominalVal = new FastVector<String>(splitter.length);
+		classNominalMap = new HashMap<String,Double>(splitter.length);
 
-		fvWekaAttributes.addElement( new Attribute("Class Attribute", fvNominalVal));
+
+		/*
+		 * populates FastVector list to add as class attribute to the dataset
+		 * populates HashMap to compare each document's class 
+		 */
+		for(int k = 0; k < splitter.length; k++){
+			classNominalVal.addElement(splitter[k].trim());
+			classNominalMap.put(splitter[k].trim(), 1.0 / (k+1.0));
+			System.out.println(classNominalMap.get(splitter[k].trim()));
+		}
+
+
+		fvWekaAttributes.addElement( new Attribute("Class Attribute", classNominalVal));
 		try{
 			dataset = new Instances("FeatureInstance",fvWekaAttributes,fvWekaAttributes.size()-1); 	
 			dataset.setClassIndex(fvWekaAttributes.size()-1);
-				System.out.println(dataset.classAttribute().toString());
-			
+			System.out.println(dataset.classAttribute().toString());
+
 			eval = new AggregateableEvaluation(dataset);
 
 		}catch(Exception e){
@@ -103,7 +123,7 @@ public class Job4_Reducer extends Reducer <IntWritable,Text,Text,Text> {
 	public void reduce(IntWritable key, Iterable<Text> values, Context context)throws IOException , InterruptedException{
 
 		int tempCount = 0;
-		
+
 		System.out.println("Reducer Key" + key.toString());
 
 		String[] lines = null, splitLine = null; 
@@ -121,6 +141,8 @@ public class Job4_Reducer extends Reducer <IntWritable,Text,Text,Text> {
 			splitLine = lines[0].split("\t");
 			instanceClass = splitLine[1];
 
+
+
 			lines[0] = "0";
 			Arrays.sort(lines, new Comparator<String>() {
 				@Override
@@ -136,43 +158,46 @@ public class Job4_Reducer extends Reducer <IntWritable,Text,Text,Text> {
 					else return 0;
 				}
 			});
-			
+
 			InstanceValues = new double[lines.length-1];
- 			InstanceIndices = new int[lines.length-1];
- 
- 			for(int k = 1; k < lines.length; k++){
- 				splitLine = lines[k].split("\t");
- 				InstanceIndices[k-1] = Integer.parseInt(splitLine[0]);
- 				InstanceValues[k-1] = Double.parseDouble(splitLine[1]);
- 			}
- 
- 			/*
- 			 * Builds Instance Row From the Value in the Loop
- 			 */
- 			SparseInstance instanceRow = new SparseInstance(1.0,InstanceValues,InstanceIndices,totalFeatures + 1);
- 			if(instanceClass.equals("rec.autos"))
- 				instanceRow.setValue(fvWekaAttributes.size()-1, 0.5);
- 			else	
- 				instanceRow.setValue(fvWekaAttributes.size()-1, 1.0);
+			InstanceIndices = new int[lines.length-1];
+
+			for(int k = 1; k < lines.length; k++){
+				splitLine = lines[k].split("\t");
+				InstanceIndices[k-1] = Integer.parseInt(splitLine[0]);
+				InstanceValues[k-1] = Double.parseDouble(splitLine[1]);
+			}
+
+			/*
+			 * Builds Instance Row From the Value in the Loop
+			 */
+			SparseInstance instanceRow = new SparseInstance(1.0,InstanceValues,InstanceIndices,totalFeatures + 1);
 			
- 			dataset.add(instanceRow);
- 			try{
- 			tempEval = new Evaluation(dataset);
- 			tempEval.evaluateModel(reducerClassifier, dataset);
- 			eval.aggregate(tempEval);
- 			
- 			dataset.delete();
- 			}catch(Exception e){
- 				e.printStackTrace();
- 			}
- 		
- 		//	context.write(new IntWritable(key.get()), new Text(val.toString()));
- 			
+			instanceRow.setValue(fvWekaAttributes.size()-1, classNominalMap.get(instanceClass));
+/*
+			if(instanceClass.equals("rec.autos"))
+				instanceRow.setValue(fvWekaAttributes.size()-1, 0.5);
+			else	
+				instanceRow.setValue(fvWekaAttributes.size()-1, 1.0);
+*/
+			dataset.add(instanceRow);
+			try{
+				tempEval = new Evaluation(dataset);
+				tempEval.evaluateModel(reducerClassifier, dataset);
+				eval.aggregate(tempEval);
+
+				dataset.delete();
+			}catch(Exception e){
+				e.printStackTrace();
+			}
+
+			//	context.write(new IntWritable(key.get()), new Text(val.toString()));
+
 		}
 
-	//	if(reducerNum == 9)
-	//	System.out.println(dataset.toString());
-	//	System.out.println(tempCount);
+		//	if(reducerNum == 9)
+		//	System.out.println(dataset.toString());
+		//	System.out.println(tempCount);
 
 	}
 
@@ -181,12 +206,21 @@ public class Job4_Reducer extends Reducer <IntWritable,Text,Text,Text> {
 	protected void cleanup(Context context) throws IOException, InterruptedException {
 
 		try{
-		System.out.println("\nEvaluation for Model: " + reducerClassifier.getClass().getSimpleName() + " | "+ eval.pctCorrect());
-		context.write(new Text("Model "+ reducerClassifier.getClass().getSimpleName() + 
-				"\nPrct Correct\t" + eval.pctCorrect()+
-				"\nPrct Incorrect\t" + eval.pctIncorrect()+
-				"\nEvaluated on\t" +eval.numInstances()+ " Instances\n\n"), 
-				new Text(eval.toMatrixString() ));
+			System.out.println("\nEvaluation for Model: " + reducerClassifier.getClass().getSimpleName() + " | "+ eval.pctCorrect());
+
+
+			double[][] doubleMatrix = eval.confusionMatrix();
+			ConfusionMatrix matrix = new ConfusionMatrix(classNominalVal.size(),docClasses.split("\n"));
+			for(int k = 0; k < classNominalVal.size(); k++){
+				matrix.setRow(k,ArrayUtils.toObject( doubleMatrix[k]));
+			}
+			
+
+			context.write(new Text("Model "+ reducerClassifier.getClass().getSimpleName() + 
+					"\nPercent Correct\t" + eval.pctCorrect()+
+					"\nPercent Incorrect\t" + eval.pctIncorrect()+
+					"\nEvaluated on\t" +eval.numInstances()+ " Instances\n\n"), 
+					new Text(eval.toMatrixString(reducerClassifier.getClass().getSimpleName()+ " Confusion Matrix")));
 		}catch(Exception e){
 			e.printStackTrace();
 		}
