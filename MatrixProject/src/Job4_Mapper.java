@@ -28,25 +28,26 @@ import weka.core.Attribute;
 import weka.core.FastVector;
 import weka.core.Instances;
 import weka.core.SparseInstance;
+import weka.core.OptionHandler;
 public class Job4_Mapper extends Mapper<Text, Text, IntWritable, Text>{
 
 	enum Job4_Mapper_Counter { LINES }
 	FastVector<Attribute> fvWekaAttributes = new FastVector<Attribute>();
 	FastVector<String> classNominalVal = null;
 	static HashMap<String,Double> classNominalMap = null;
-	static HashMap<String,Integer> classifierIndexMap = null;
+	static HashMap<String,String> classifierIndexMap = null;
 
 
 	int totalDocuments = 0, mapperNum = 0, totalFeatures = 0,numFolds = 0, numDocsInFold = 0, currentPartition = 0, tempCount = 0;;
 	int[] mapWriteCount = new int[10];
 
 	static String outputPath = null, docClasses = null;
-	static String[] classifiersToBuildNames = null;
+	static String[] classifiersToBuildNames = null, classifierOptions = null;
 	long docCounter = 0;
 
 	static Instances dataset = null, tempSet = null;
 
-	static Classifier[] models = { new J48(),new PART(),new DecisionTable(),new DecisionStump() ,new NaiveBayes(), new BayesNet(),new KStar(),new ZeroR(),new OneR(),new REPTree()};
+	static Classifier[] models = null;// { new J48(),new PART(),new DecisionTable(),new DecisionStump() ,new NaiveBayes(), new BayesNet(),new KStar(),new ZeroR(),new OneR(),new REPTree()};
 
 
 	public void setup(Context context) {
@@ -62,10 +63,11 @@ public class Job4_Mapper extends Mapper<Text, Text, IntWritable, Text>{
 		numFolds = Integer.parseInt(conf.get("numFolds"));
 		numDocsInFold = (int)(totalDocuments/numFolds);
 
-		classifiersToBuildNames = conf.get("parClassifiers").split(",");
+		classifiersToBuildNames = conf.get("parClassifiers").split("\t");
 		indexClassifierBank();
+		initClassifiers();
 
-
+		
 		System.out.println("\n****************** Processing Job 4 Mapper: "+mapperNum+ " ******************\n");
 
 
@@ -151,12 +153,8 @@ public class Job4_Mapper extends Mapper<Text, Text, IntWritable, Text>{
 		SparseInstance instanceRow = new SparseInstance(1.0,InstanceValues,InstanceIndices,fvWekaAttributes.size()-1);
 
 		instanceRow.setValue(fvWekaAttributes.size()-1, classNominalMap.get(instanceClass));
-		/*	
-		if(instanceClass.equals("rec.autos"))
-			instanceRow.setValue(fvWekaAttributes.size()-1, 0.5);
-		else	
-			instanceRow.setValue(fvWekaAttributes.size()-1, 1.0);
-		 */
+
+
 		dataset.add(instanceRow);	
 
 		/*
@@ -178,7 +176,7 @@ public class Job4_Mapper extends Mapper<Text, Text, IntWritable, Text>{
 				currentPartition++;
 			}
 		}
-		
+
 		else if(docCounter%numDocsInFold != 0){
 			if(mapperNum == currentPartition){
 				context.write(new IntWritable(currentPartition+1), new Text(docID_Class_Text.toString() + "\n"+feature_Set.toString()));
@@ -193,34 +191,6 @@ public class Job4_Mapper extends Mapper<Text, Text, IntWritable, Text>{
 			currentPartition++;
 		}
 
-		/*	
-		if(mapperNum == 0 && currentPartition != 10){
-			if(docCounter%numDocsInFold != 0){
-				context.write(new IntWritable(currentPartition), new Text(docID_Class_Text.toString() + "\n"+feature_Set.toString()));
-				mapWriteCount[mapperNum]++;
-			}
-			else{
-				context.write(new IntWritable(currentPartition), new Text(docID_Class_Text.toString() + "\n"+feature_Set.toString()));
-				currentPartition++;
-				mapWriteCount[mapperNum]++;
-			}
-		}
-		/*
-		 * Writes out the first fold of the matrix only because it is the only fold missing from the first mapper
-
-		else if(mapperNum == 1){
-			if(( docCounter%numDocsInFold != 0) && currentPartition == 0){
-
-				context.write(new IntWritable(currentPartition), new Text(docID_Class_Text.toString() + "\n"+feature_Set.toString()));
-				mapWriteCount[mapperNum]++;
-			}
-			else if(currentPartition == 0){
-				context.write(new IntWritable(currentPartition), new Text(docID_Class_Text.toString() + "\n"+feature_Set.toString()));
-				currentPartition++;
-				mapWriteCount[mapperNum]++;
-			}
-		}
-		 */
 		if(docCounter > numDocsInFold * (numFolds -1)){
 			context.write(new IntWritable(mapperNum), new Text(docID_Class_Text.toString() + "\n"+feature_Set.toString()));
 			mapWriteCount[mapperNum]++;
@@ -238,11 +208,11 @@ public class Job4_Mapper extends Mapper<Text, Text, IntWritable, Text>{
 		ClassifierModelsDir.mkdirs();
 
 		try{
-			for(int k = 0; k < classifiersToBuildNames.length;k++)
-			models[classifierIndexMap.get(classifiersToBuildNames[k])].buildClassifier(dataset);
+			for(int k = 0; k < models.length;k++)
+				models[k].buildClassifier(dataset);
 			//System.out.println("Classifier: " + key.get()+ " " +models[key.get()].toSummaryString());
-			for(int k = 0; k < classifiersToBuildNames.length;k++){
-			weka.core.SerializationHelper.write(outputPath+"Models/Mapper_"+mapperNum +"/"+classifiersToBuildNames[k]+".model", models[classifierIndexMap.get(classifiersToBuildNames[k])]);
+			for(int k = 0; k < models.length;k++){
+				weka.core.SerializationHelper.write(outputPath+"Models/Mapper_"+mapperNum +"/"+models[k].getClass().getSimpleName()+".model", models[k]);
 			}
 			//System.out.println(dataset.toString());
 			dataset.delete();
@@ -255,13 +225,127 @@ public class Job4_Mapper extends Mapper<Text, Text, IntWritable, Text>{
 		//	System.out.println(context.getCounter(Job4_Mapper_Counter.LINES).getValue());
 	}
 
+	/*
+	 * Populates Map with the name of the classifiers to be used as the key
+	 * and the option parameters as the values.
+	 * This map is used to initialize the specific classifiers with their 
+	 * options in the initClassifiers method.
+	 */
 	public static void indexClassifierBank(){
-		
-		classifierIndexMap = new HashMap<String,Integer>(models.length);
 
-		//populates map with the classifier bank names and their indices
-		for(int k = 0; k < models.length; k++)
-			classifierIndexMap.put(models[k].getClass().getSimpleName(), k);
+		String[] splitter = null;
+		classifierIndexMap = new HashMap<String,String>(classifiersToBuildNames.length);
+
+		for(int k = 0; k < classifiersToBuildNames.length; k++){
+			splitter = classifiersToBuildNames[k].split(",");
+			if(splitter.length > 1)
+			classifierIndexMap.put(splitter[0],splitter[1]);
+			else
+				classifierIndexMap.put(splitter[0],"");
+		}
 
 	}
+
+	public static void initClassifiers(){
+		
+		models = new Classifier[classifiersToBuildNames.length];
+		int modelsIndex = 0;
+		J48 j48 = null;
+		PART part = null;
+		DecisionTable decisionTable = null;
+		DecisionStump decisionStump = null;
+		NaiveBayes naiveBayes = null;
+		BayesNet bayesNet = null;
+		KStar kStar = null;
+		OneR oneR = null;
+		ZeroR zeroR = null;
+		REPTree repTree = null;
+
+		try{
+			if(classifierIndexMap.containsKey("J48")){
+				j48 = new J48();
+				j48.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("J48")));
+				System.out.println("Training on J48 with options: "+Arrays.toString(j48.getOptions()));
+				models[modelsIndex] = j48;
+				modelsIndex++;
+			}
+			if(classifierIndexMap.containsKey("PART")){
+				part = new PART();
+				part.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("PART")));
+				models[modelsIndex] = part;
+				modelsIndex++;
+			}
+			if(classifierIndexMap.containsKey("DecisionTable")){
+				decisionTable = new DecisionTable();
+				decisionTable.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("DecisionTable")));
+				models[modelsIndex] = decisionTable;
+				modelsIndex++;
+			}
+			if(classifierIndexMap.containsKey("DecisionStump")){
+				decisionStump = new DecisionStump();
+				decisionStump.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("DecisionStump")));
+				models[modelsIndex] = decisionStump;
+				modelsIndex++;
+			}
+			if(classifierIndexMap.containsKey("NaiveBayes")){
+				naiveBayes = new NaiveBayes();
+				naiveBayes.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("NaiveBayes")));
+				models[modelsIndex] = naiveBayes;
+				modelsIndex++;
+			}
+			if(classifierIndexMap.containsKey("BayesNet")){
+				bayesNet = new BayesNet();
+				bayesNet.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("BayesNet")));
+				models[modelsIndex] = bayesNet;
+				modelsIndex++;
+			}
+			if(classifierIndexMap.containsKey("OneR")){
+				oneR = new OneR();
+				oneR.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("OneR")));
+				models[modelsIndex] = oneR;
+				modelsIndex++;
+			}
+			if(classifierIndexMap.containsKey("KStar")){
+				kStar = new KStar();
+				kStar.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("KStar")));
+				models[modelsIndex] = kStar;
+				modelsIndex++;
+			}
+			if(classifierIndexMap.containsKey("ZeroR")){
+				zeroR = new ZeroR();
+				zeroR.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("ZeroR")));
+				models[modelsIndex] = zeroR;
+				modelsIndex++;
+			}
+			if(classifierIndexMap.containsKey("REPTree")){
+				repTree = new REPTree();
+				repTree.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("REPTree")));
+				models[modelsIndex] = repTree;
+				modelsIndex++;
+			}
+
+
+		}catch(Exception e){
+			e.printStackTrace();
+		}
+
+	}
+
+	public static void setOptions(String[] classifiersPar){
+
+		String[] splitter = null;
+		for(int k = 0; k < classifiersToBuildNames.length; k++){
+			splitter = classifiersToBuildNames[k].split(",");
+			classifiersToBuildNames[k] = splitter[0];
+			//OptionHandler x = new OptionHandler();
+
+			//	(new OptionHandler) models[classifierIndexMap.get(classifiersToBuildNames[k])] = null;
+
+
+
+		}
+		//	models[classifierIndexMap.get(classifiersToBuildNames[k])]
+
+	}
+
 }

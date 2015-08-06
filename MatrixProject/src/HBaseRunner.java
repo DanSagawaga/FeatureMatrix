@@ -29,6 +29,8 @@ import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.mapreduce.lib.input.SequenceFileAsTextInputFormat;
+import org.apache.hadoop.io.compress.SnappyCodec;
+import org.apache.hadoop.io.SequenceFile.CompressionType;
 
 import weka.classifiers.Classifier;
 import weka.classifiers.bayes.BayesNet;
@@ -48,9 +50,9 @@ public class HBaseRunner extends Configured implements Tool {
 	static File existingDirs[] = new File[1];
 
 	static boolean jobsSuccess = false;
-	static boolean[] jobsToRun = {true,true,true,true};
+	static boolean[] jobsToRun = {true,true,true,false};
 
-	static int instanceSize = 0, numFolds = 0, numClasses = 0;
+	static int instanceSize = 0, numFolds = 0, numClasses = 0, numClassifiers = 0;
 	static long totalDocuments = 0, totalRecords = 0, totalFeatures = 0, startTime = 0, stopTime = 0, totalStartTime = 0, totalStopTime = 0;
 
 	static Classifier[] models = { new J48(),new PART(),new DecisionTable(),new DecisionStump() ,new NaiveBayes(), new BayesNet(),new KStar(),new ZeroR(),new OneR(),new REPTree()};
@@ -64,16 +66,19 @@ public class HBaseRunner extends Configured implements Tool {
 		try{
 			numFolds = Integer.parseInt(args[1]);
 
-			for(int k = 2; k < args.length; k++)
-				parClassifiers += args[k]+ ",";
+			for(int k = 2; k < args.length; k++){
+				parClassifiers += args[k]+ "\t";
+				numClassifiers++;
+			}
 
 			if(numFolds < 2){
 				System.out.println("Number of folds must be greater than 2!");
 				System.out.println("Ending Program.");
 				System.exit(-1);
 			}
-
-			System.out.println(parClassifiers);
+			
+		//	for(int k = 0; k < args.length; k++)
+		//	System.out.println(args[k]);
 
 			/*
 			 * Instantiates all the output and Input directories needed
@@ -81,7 +86,7 @@ public class HBaseRunner extends Configured implements Tool {
 			initPaths(args);
 			//Recursively deletes exisiting output directories
 			//pickBestModel();
-				deleteDirs(existingDirs);
+			deleteDirs(existingDirs);
 
 			ToolRunner.run(new Configuration(), new HBaseRunner(), args);
 
@@ -117,6 +122,7 @@ public class HBaseRunner extends Configured implements Tool {
 
 			SequenceFileInputFormat.addInputPath(job1, featureSetPath);
 			job1.setMapperClass(DocCounterMapper.class);
+		//	job1.setCombinerClass(DocCounterCombiner.class);
 			job1.setInputFormatClass(SequenceFileInputFormat.class);
 			job1.setReducerClass(DocCounterReducer.class);
 			job1.setOutputKeyClass(Text.class);
@@ -175,6 +181,10 @@ public class HBaseRunner extends Configured implements Tool {
 			//job2.setOutputFormatClass(SequenceFileOutputFormat.class);
 			//SequenceFileOutputFormat.setOutputPath(job2, outputPath2);
 			FileOutputFormat.setOutputPath(job2, outputPath2);
+		    FileOutputFormat.setCompressOutput(job2, true);
+		    FileOutputFormat.setOutputCompressorClass(job2, SnappyCodec.class);
+		    SequenceFileOutputFormat.setOutputCompressionType(job2,CompressionType.BLOCK);
+
 
 			jobsSuccess = job2.waitForCompletion(true);
 
@@ -224,9 +234,11 @@ public class HBaseRunner extends Configured implements Tool {
 			MultipleOutputs.addNamedOutput(job3, "DocumentClasses", TextOutputFormat.class, Text.class, Text.class);
 
 
-
 			FileOutputFormat.setOutputPath(job3, outputPath3);
 			SequenceFileOutputFormat.setOutputPath(job3,outputPath3);
+		    FileOutputFormat.setCompressOutput(job3, true);
+		    FileOutputFormat.setOutputCompressorClass(job3, SnappyCodec.class);
+		    SequenceFileOutputFormat.setOutputCompressionType(job3,CompressionType.BLOCK);
 
 			jobsSuccess = job3.waitForCompletion(true);
 
@@ -276,7 +288,8 @@ public class HBaseRunner extends Configured implements Tool {
 			job4.setOutputFormatClass(TextOutputFormat.class);
 			FileOutputFormat.setOutputPath(job4, outputPath4);
 
-			//	MultipleOutputs.addNamedOutput(job4, "MatrixFold0",TextOutputFormat.class,Text.class, Text.class);
+			for(int k = 0; k < numClassifiers; k++)
+				MultipleOutputs.addNamedOutput(job4, "ReducerModel"+k,TextOutputFormat.class,Text.class, Text.class);
 			//	MultipleOutputs.addNamedOutput(job4, "MatrixFold1",TextOutputFormat.class,Text.class, Text.class);
 
 			jobsSuccess = job4.waitForCompletion(true);
@@ -370,7 +383,7 @@ public class HBaseRunner extends Configured implements Tool {
 		outputPath = new Path(args[0]+"/TF_IDF/DocumentCounter");///home/cloudera/Documents/TF_IDF
 		outputPath2 = new Path(args[0]+"/TF_IDF/MatrixIntermediateFormat");// /home/cloudera/Documents/TF_IDF
 		outputPath3 = new Path(args[0]+"/TF_IDF/MatrixTrainingFolds");///home/cloudera/Documents/TF_IDF
-		outputPath4 = new Path(args[0]+"/TF_IDF/ClassifierModels");///home/cloudera/Documents/TF_IDF
+		outputPath4 = new Path(args[0]+"/TF_IDF/ClassifierModels");///home/cloudera/Documents/TF_IDF	
 		existingDirs[0] = new File(args[0] + "/TF_IDF");
 	}
 
@@ -380,6 +393,16 @@ public class HBaseRunner extends Configured implements Tool {
 			context.write(DocID, new IntWritable(1));
 		}
 	}
+	public static class DocCounterCombiner extends Reducer<Text,IntWritable,Text,IntWritable> {
+		public void reduce(Text key, Iterable<Text> values,  Context context) throws IOException, InterruptedException {
+			int docCount = 0;
+			for(Text value: values){
+				docCount++;
+			}
+			context.write(new Text(""), new IntWritable(docCount));
+		}
+	}
+	
 	public static class DocCounterReducer extends Reducer<Text, IntWritable, Text, IntWritable> {
 		public void reduce(Text key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
 			int sum = 0;
@@ -395,7 +418,6 @@ public class HBaseRunner extends Configured implements Tool {
 
 		public void setup(Context context) {
 			System.out.println("\n******** Processing TD_IDF_Reducer ********\n");
-			mos = new MultipleOutputs(context);
 		}
 
 		protected void cleanup(Context context) throws IOException, InterruptedException {
