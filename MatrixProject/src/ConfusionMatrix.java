@@ -93,6 +93,127 @@ public class ConfusionMatrix {
 		displayPerClassMeasures();
 	}
 	
+	public String toString() {
+		String output = "";
+		output+=("confusion matrix: (cols=predicted rows=expected)\n");
+
+		// display column labels
+		for (ClassLabelData cld : classLabelData_) System.out.print("\t"+cld.getLabel());
+		output+="\n";
+
+		// display the content of the matrix
+		for (int row=0; row<matrix_.rows(); row++) {
+			output+=(classLabelData_.get(row).getLabel() + "\t" + matrix_.getRow(row).toString()+"\n");
+		}
+
+		// entire matrix stats and performance
+		output+=("\nMatrix\n");
+		output+=("\ttotal elements: " + getTotalElements()+"\n");
+
+		// display class stats and performance
+		output+=toStringClassMeasures();
+		return output;
+	}
+	
+	public String toStringClassMeasures() {
+		String output = "";
+		int upperBoundary = 0;
+		if (classLabelData_.size()==2) {
+			upperBoundary = 1;
+		}
+		else {
+			output+=("Per class results measures:\n");
+			upperBoundary = classLabelData_.size();
+		}
+		
+		for (int classIndex=0; classIndex<upperBoundary; classIndex++) {
+			output+=("\t" + classLabelData_.get(classIndex).getLabel());
+		}
+		output+="\n";
+		output+=("count");
+		for (int classIndex=0; classIndex<upperBoundary; classIndex++) {
+			output+=("\t" + classLabelData_.get(classIndex).getTotalElements());
+		}
+		output+=("\ttotal count\n");
+		output+=("TP");
+		for (int classIndex=0; classIndex<upperBoundary; classIndex++) {
+			output+=("\t" + Formatting.format(classLabelData_.get(classIndex).truePositives(), 3));
+		}
+		output+=("\tTrue Positives\n");
+		output+=("FP");
+		for (int classIndex=0; classIndex<upperBoundary; classIndex++) {
+			output+=("\t" + Formatting.format(classLabelData_.get(classIndex).falsePositives(), 3));
+		}
+		output+=("\tFalse Positives\n");
+		output+=("TN");
+		for (int classIndex=0; classIndex<upperBoundary; classIndex++) {
+			output+=("\t" + Formatting.format(classLabelData_.get(classIndex).trueNegatives(), 3));
+		}
+		output+=("\tTrue Negatives\n");
+		output+=("FN");
+		for (int classIndex=0; classIndex<upperBoundary; classIndex++) {
+			output+=("\t" + Formatting.format(classLabelData_.get(classIndex).falseNegatives(), 3));
+		}
+		output+=("\tFalse Negatives\n");
+		output+=("ACC");
+		for (int classIndex=0; classIndex<upperBoundary; classIndex++) {
+			output+=("\t" + Formatting.format(classLabelData_.get(classIndex).accuracy(), 3));
+		}
+		output+=("\tAccuracy\n");
+		output+=("P");
+		for (int classIndex=0; classIndex<upperBoundary; classIndex++) {
+			output+=("\t" + Formatting.format(classLabelData_.get(classIndex).precision(), 3));
+		}
+		output+=("\tPrecision/Predictive Positive Value\n");
+		output+=("R");
+		for (int classIndex=0; classIndex<upperBoundary; classIndex++) {
+			output+=("\t" + Formatting.format(classLabelData_.get(classIndex).recall(), 3));
+		}
+		output+=("\tRecall/Sensitivity/True Positive Rate\n");
+		output+=("SPC");
+		for (int classIndex=0; classIndex<upperBoundary; classIndex++) {
+			output+=("\t" + Formatting.format(classLabelData_.get(classIndex).specificity(), 3));
+		}
+		output+=("\tSpecificity/True Negative Rate\n");
+		output+=("F1");
+		for (int classIndex=0; classIndex<upperBoundary; classIndex++) {
+			output+=("\t" + Formatting.format(classLabelData_.get(classIndex).f1Measure(), 3));
+		}
+		output+=("\tF1-Measure\n");
+		output+=("F2");
+		for (int classIndex=0; classIndex<upperBoundary; classIndex++) {
+			output+=("\t" + Formatting.format(classLabelData_.get(classIndex).f2Measure(), 3));
+		}
+		output+=("\tF2-Measure\n");
+		output+=("F0.5");
+		for (int classIndex=0; classIndex<upperBoundary; classIndex++) {
+			output+=("\t" + Formatting.format(classLabelData_.get(classIndex).f05Measure(), 3));
+		}
+		output+=("\tF0.5-Measure\n");
+		output+=("NPV");
+		for (int classIndex=0; classIndex<upperBoundary; classIndex++) {
+			output+=("\t" + Formatting.format(classLabelData_.get(classIndex).negativePredictionValue(), 3));
+		}
+		output+=("\tNegative Prediction Value\n");
+		output+=("FPR");
+		for (int classIndex=0; classIndex<upperBoundary; classIndex++) {
+			output+=("\t" + Formatting.format(classLabelData_.get(classIndex).falsePredictiveRate(), 3));
+		}
+		output+=("\tFallout/False Positive Rate\n");
+		output+=("FDR");
+		for (int classIndex=0; classIndex<upperBoundary; classIndex++) {
+			output+=("\t" + Formatting.format(classLabelData_.get(classIndex).falseDiscoveryRate(), 3));
+		}
+		output+=("\tFalse Discovery Rate\n");
+		output+=("MCC");
+		for (int classIndex=0; classIndex<upperBoundary; classIndex++) {
+			output+=("\t" + Formatting.format(classLabelData_.get(classIndex).matthewsCorrelationCoefficient(), 3));
+		}
+		output+=("\tMatthews Correlation Coefficient\n");
+		
+		return output;
+	}
+	
 	public void displayPerClassMeasures() {
 		int upperBoundary = 0;
 		if (classLabelData_.size()==2) {
@@ -401,6 +522,27 @@ public class ConfusionMatrix {
 			System.out.println("\tFPR: " + Formatting.format(fallout(), 3));
 			System.out.println("\tFDR: " + Formatting.format(falseDiscoveryRate(), 3));
 			System.out.println("\tMCC: " + Formatting.format(matthewsCorrelationCoefficient(), 3));
+		}
+		public String toString() {
+			String output = "";
+			output+=("\nClass " + label_);
+			output+=("\tcount: " + totalElements_);
+			output+=("\tTP: " + tp_);
+			output+=("\tFP: " + fp_);
+			output+=("\tTN: " + tn_);
+			output+=("\tFN: " + fn_);
+			output+=("\tACC: " + Formatting.format(accuracy(), 3));
+			output+=("\tP: " + Formatting.format(precision(), 3));
+			output+=("\tR: " + Formatting.format(recall(), 3));
+			output+=("\tSPC: " + Formatting.format(specificity(), 3));
+			output+=("\tF1: " + Formatting.format(f1Measure(), 3));
+			output+=("\tF2: " + Formatting.format(f2Measure(), 3));
+			output+=("\tF0.5: " + Formatting.format(f05Measure(), 3));
+			output+=("\tNPV: " + Formatting.format(negativePredictionValue(), 3));
+			output+=("\tFPR: " + Formatting.format(fallout(), 3));
+			output+=("\tFDR: " + Formatting.format(falseDiscoveryRate(), 3));
+			output+=("\tMCC: " + Formatting.format(matthewsCorrelationCoefficient(), 3));
+			return output;
 		}
 	}
 

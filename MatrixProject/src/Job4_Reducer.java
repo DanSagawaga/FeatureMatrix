@@ -217,10 +217,9 @@ public class Job4_Reducer extends Reducer <IntWritable,Text,Text,Text> {
 			
 
 			context.write(new Text("Model "+ reducerClassifier.getClass().getSimpleName() + 
-					"\nPercent Correct\t" + eval.pctCorrect()+
-					"\nPercent Incorrect\t" + eval.pctIncorrect()+
-					"\nEvaluated on\t" +eval.numInstances()+ " Instances\n\n"), 
-					new Text(eval.toMatrixString(reducerClassifier.getClass().getSimpleName()+ " Confusion Matrix")));
+					matrix.toString()),new Text(""));
+			//matrix.display();
+					//new Text(eval.toMatrixString(reducerClassifier.getClass().getSimpleName()+ " Confusion Matrix")));
 		}catch(Exception e){
 			e.printStackTrace();
 		}

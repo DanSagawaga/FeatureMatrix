@@ -30,17 +30,20 @@ import weka.core.Instances;
 import weka.core.SparseInstance;
 public class Job4_Mapper extends Mapper<Text, Text, IntWritable, Text>{
 
-    enum Job4_Mapper_Counter { LINES }
+	enum Job4_Mapper_Counter { LINES }
 	FastVector<Attribute> fvWekaAttributes = new FastVector<Attribute>();
 	FastVector<String> classNominalVal = null;
-	HashMap<String,Double> classNominalMap = null;
+	static HashMap<String,Double> classNominalMap = null;
+	static HashMap<String,Integer> classifierIndexMap = null;
 
-    int totalDocuments = 0, mapperNum = 0, totalFeatures = 0,numFolds = 0, numDocsInFold = 0, currentPartition = 0, mapperClassifierIndex = 0, tempCount = 0;;
+
+	int totalDocuments = 0, mapperNum = 0, totalFeatures = 0,numFolds = 0, numDocsInFold = 0, currentPartition = 0, tempCount = 0;;
 	int[] mapWriteCount = new int[10];
-	
-	static String outputPath = null, mapperClassifierStr = null, docClasses = null;
+
+	static String outputPath = null, docClasses = null;
+	static String[] classifiersToBuildNames = null;
 	long docCounter = 0;
-	
+
 	static Instances dataset = null, tempSet = null;
 
 	static Classifier[] models = { new J48(),new PART(),new DecisionTable(),new DecisionStump() ,new NaiveBayes(), new BayesNet(),new KStar(),new ZeroR(),new OneR(),new REPTree()};
@@ -50,21 +53,18 @@ public class Job4_Mapper extends Mapper<Text, Text, IntWritable, Text>{
 		TaskAttemptID tid = context.getTaskAttemptID();		
 		String[] splitter = tid.toString().split("_");
 		mapperNum = Integer.parseInt(splitter[4]);
-		
-		
+
+
 		Configuration conf = context.getConfiguration();
 		docClasses = conf.get("docClasses");
 		totalFeatures = Integer.parseInt(conf.get("totalFeatures"));
 		totalDocuments= Integer.parseInt(conf.get("totalDocuments"));
 		numFolds = Integer.parseInt(conf.get("numFolds"));
 		numDocsInFold = (int)(totalDocuments/numFolds);
-		
-		mapperClassifierStr = conf.get("parClassifiers");
-		mapperClassifierIndex = getClassifierIndex(mapperClassifierStr, mapperNum);
-		
 
-		if(mapperNum == 0)
-			currentPartition = 1;
+		classifiersToBuildNames = conf.get("parClassifiers").split(",");
+		indexClassifierBank();
+
 
 		System.out.println("\n****************** Processing Job 4 Mapper: "+mapperNum+ " ******************\n");
 
@@ -83,9 +83,9 @@ public class Job4_Mapper extends Mapper<Text, Text, IntWritable, Text>{
 		 * populates HashMap to compare each document's class 
 		 */
 		for(int k = 0; k < splitter.length; k++){
-		classNominalVal.addElement(splitter[k].trim());
-		classNominalMap.put(splitter[k].trim(), 1.0 / (k+1.0));
-		System.out.println(classNominalMap.get(splitter[k].trim()));
+			classNominalVal.addElement(splitter[k].trim());
+			classNominalMap.put(splitter[k].trim(), 1.0 / (k+1.0));
+			System.out.println(classNominalMap.get(splitter[k].trim()));
 		}
 
 		fvWekaAttributes.addElement( new Attribute("Class Attribute", classNominalVal));
@@ -107,10 +107,10 @@ public class Job4_Mapper extends Mapper<Text, Text, IntWritable, Text>{
 
 		context.getCounter(Job4_Mapper_Counter.LINES).increment(1);//increments the counter so it can be used as indexer
 		docCounter = context.getCounter(Job4_Mapper_Counter.LINES).getValue();
-		
-	//	System.out.println("Mapper " + mapperNum + "\t" +docID_Class_Text.toString());
 
-		
+		//	System.out.println("Mapper " + mapperNum + "\t" +docID_Class_Text.toString());
+
+
 		String[] lines = null, splitLine = null; 
 		String instanceClass = null;
 
@@ -149,20 +149,51 @@ public class Job4_Mapper extends Mapper<Text, Text, IntWritable, Text>{
 		 * Builds Instance Row From the Value in the Loop
 		 */
 		SparseInstance instanceRow = new SparseInstance(1.0,InstanceValues,InstanceIndices,fvWekaAttributes.size()-1);
-		
+
 		instanceRow.setValue(fvWekaAttributes.size()-1, classNominalMap.get(instanceClass));
-/*	
+		/*	
 		if(instanceClass.equals("rec.autos"))
 			instanceRow.setValue(fvWekaAttributes.size()-1, 0.5);
 		else	
 			instanceRow.setValue(fvWekaAttributes.size()-1, 1.0);
-*/
+		 */
 		dataset.add(instanceRow);	
 
 		/*
 		 * The First two mappers write out collectively the entire matrix to the reducers for the test and evaluation phase of the models.
 		 * The rest of the mappers write out their remainders that were evenly partitioned in the Job 3 Reducer
 		 */
+		if(mapperNum==9){
+			if(docCounter%numDocsInFold != 0){
+				if(mapperNum - 1 == currentPartition){
+					context.write(new IntWritable(0), new Text(docID_Class_Text.toString() + "\n"+feature_Set.toString()));
+					mapWriteCount[mapperNum]++;
+				}
+			}
+			else{
+				if(mapperNum -1 == currentPartition-1){
+					context.write(new IntWritable(0), new Text(docID_Class_Text.toString() + "\n"+feature_Set.toString()));
+					mapWriteCount[mapperNum]++;
+				}
+				currentPartition++;
+			}
+		}
+		
+		else if(docCounter%numDocsInFold != 0){
+			if(mapperNum == currentPartition){
+				context.write(new IntWritable(currentPartition+1), new Text(docID_Class_Text.toString() + "\n"+feature_Set.toString()));
+				mapWriteCount[mapperNum]++;
+			}
+		}
+		else{
+			if(mapperNum == currentPartition){
+				context.write(new IntWritable(currentPartition+1), new Text(docID_Class_Text.toString() + "\n"+feature_Set.toString()));
+				mapWriteCount[mapperNum]++;
+			}
+			currentPartition++;
+		}
+
+		/*	
 		if(mapperNum == 0 && currentPartition != 10){
 			if(docCounter%numDocsInFold != 0){
 				context.write(new IntWritable(currentPartition), new Text(docID_Class_Text.toString() + "\n"+feature_Set.toString()));
@@ -176,7 +207,7 @@ public class Job4_Mapper extends Mapper<Text, Text, IntWritable, Text>{
 		}
 		/*
 		 * Writes out the first fold of the matrix only because it is the only fold missing from the first mapper
-		 */
+
 		else if(mapperNum == 1){
 			if(( docCounter%numDocsInFold != 0) && currentPartition == 0){
 
@@ -189,7 +220,8 @@ public class Job4_Mapper extends Mapper<Text, Text, IntWritable, Text>{
 				mapWriteCount[mapperNum]++;
 			}
 		}
-		else if(docCounter > numDocsInFold * (numFolds -1)){
+		 */
+		if(docCounter > numDocsInFold * (numFolds -1)){
 			context.write(new IntWritable(mapperNum), new Text(docID_Class_Text.toString() + "\n"+feature_Set.toString()));
 			mapWriteCount[mapperNum]++;
 		}
@@ -197,18 +229,21 @@ public class Job4_Mapper extends Mapper<Text, Text, IntWritable, Text>{
 
 	}
 	protected void cleanup(Context context) throws IOException, InterruptedException {
-		
-		System.out.println("Mapper "+ mapperNum + " | wrote out "+mapWriteCount[mapperNum] + " instances");
-		
+
+		System.out.println("Mapper "+ mapperNum + " | wrote out "+mapWriteCount[mapperNum] + " instances\n");
+
 		Configuration conf = context.getConfiguration();
 		outputPath = conf.get("modelsPath");
-		File ClassifierModelsDir = new File(outputPath+"Models/");
+		File ClassifierModelsDir = new File(outputPath+"Models/Mapper_"+mapperNum);
 		ClassifierModelsDir.mkdirs();
 
 		try{
-			models[mapperClassifierIndex].buildClassifier(dataset);
+			for(int k = 0; k < classifiersToBuildNames.length;k++)
+			models[classifierIndexMap.get(classifiersToBuildNames[k])].buildClassifier(dataset);
 			//System.out.println("Classifier: " + key.get()+ " " +models[key.get()].toSummaryString());
-			weka.core.SerializationHelper.write(outputPath+"Models/"+mapperNum +"_"+mapperClassifierStr+".model", models[mapperClassifierIndex]);
+			for(int k = 0; k < classifiersToBuildNames.length;k++){
+			weka.core.SerializationHelper.write(outputPath+"Models/Mapper_"+mapperNum +"/"+classifiersToBuildNames[k]+".model", models[classifierIndexMap.get(classifiersToBuildNames[k])]);
+			}
 			//System.out.println(dataset.toString());
 			dataset.delete();
 
@@ -217,22 +252,16 @@ public class Job4_Mapper extends Mapper<Text, Text, IntWritable, Text>{
 		}catch (Exception e){
 			e.printStackTrace();
 		}
-	//	System.out.println(context.getCounter(Job4_Mapper_Counter.LINES).getValue());
+		//	System.out.println(context.getCounter(Job4_Mapper_Counter.LINES).getValue());
 	}
-	
-	public static int getClassifierIndex(String classifierPar, int mapperNumPar){
-		int index = -1;
-		String splitter[] = classifierPar.split(",");
-		mapperClassifierStr = splitter[mapperNumPar];
+
+	public static void indexClassifierBank(){
 		
-		for(int k = 0; k < models.length; k++){
-			if(mapperClassifierStr.equals(models[k].getClass().getSimpleName()))
-					index = k;
-		}
-		if(index == -1){
-			System.out.println("Could not find classifier name: "+ mapperClassifierStr+ " Defaulting to classifer: "+ models[0].getClass().getSimpleName());
-		index = 0;	
-		}
-		return index;
+		classifierIndexMap = new HashMap<String,Integer>(models.length);
+
+		//populates map with the classifier bank names and their indices
+		for(int k = 0; k < models.length; k++)
+			classifierIndexMap.put(models[k].getClass().getSimpleName(), k);
+
 	}
 }

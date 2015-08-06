@@ -48,7 +48,7 @@ public class HBaseRunner extends Configured implements Tool {
 	static File existingDirs[] = new File[1];
 
 	static boolean jobsSuccess = false;
-	static boolean[] jobsToRun = {false,false,false,false};
+	static boolean[] jobsToRun = {true,true,true,true};
 
 	static int instanceSize = 0, numFolds = 0, numClasses = 0;
 	static long totalDocuments = 0, totalRecords = 0, totalFeatures = 0, startTime = 0, stopTime = 0, totalStartTime = 0, totalStopTime = 0;
@@ -63,19 +63,12 @@ public class HBaseRunner extends Configured implements Tool {
 
 		try{
 			numFolds = Integer.parseInt(args[1]);
-			numClasses = Integer.parseInt(args[2]);
 
-
-			for(int k = 3; k < args.length; k++)
+			for(int k = 2; k < args.length; k++)
 				parClassifiers += args[k]+ ",";
 
 			if(numFolds < 2){
 				System.out.println("Number of folds must be greater than 2!");
-				System.out.println("Ending Program.");
-				System.exit(-1);
-			}
-			if(numFolds != args.length -3){
-				System.out.println("Number of folds must equal number of classifiers");
 				System.out.println("Ending Program.");
 				System.exit(-1);
 			}
@@ -87,8 +80,8 @@ public class HBaseRunner extends Configured implements Tool {
 			 */
 			initPaths(args);
 			//Recursively deletes exisiting output directories
-			pickBestModel();
-			//	deleteDirs(existingDirs);
+			//pickBestModel();
+				deleteDirs(existingDirs);
 
 			ToolRunner.run(new Configuration(), new HBaseRunner(), args);
 

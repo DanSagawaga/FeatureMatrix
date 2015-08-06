@@ -16,5 +16,6 @@
 	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/La4j 0.5.5"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/La4j 0.5.0"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/Text-Analytics"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/la4j 5.0"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
