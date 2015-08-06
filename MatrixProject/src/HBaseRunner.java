@@ -1,48 +1,25 @@
 import java.io.*;
 import java.util.*;
 
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.*;
-import org.apache.hadoop.mapreduce.Mapper.Context;
-import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.mapreduce.TableOutputFormat;
-import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat;
-import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
-import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.mapreduce.lib.input.MultipleInputs;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.Reducer;
-import org.apache.hadoop.mapreduce.OutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.LazyOutputFormat; 
-import org.apache.hadoop.mapreduce.lib.input.NLineInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.MultipleOutputs;
 import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
-import org.apache.hadoop.mapreduce.TaskAttemptID;
 import java.io.File;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.hadoop.conf.Configured;
-import org.apache.hadoop.mapreduce.lib.input.SequenceFileAsTextInputFormat;
-import org.apache.hadoop.io.compress.SnappyCodec;
-import org.apache.hadoop.io.SequenceFile.CompressionType;
 
-import weka.classifiers.Classifier;
-import weka.classifiers.bayes.BayesNet;
-import weka.classifiers.bayes.NaiveBayes;
-import weka.classifiers.lazy.KStar;
-import weka.classifiers.rules.DecisionTable;
-import weka.classifiers.rules.OneR;
-import weka.classifiers.rules.PART;
-import weka.classifiers.rules.ZeroR;
-import weka.classifiers.trees.DecisionStump;
-import weka.classifiers.trees.J48;
-import weka.classifiers.trees.REPTree;
+
 
 public class HBaseRunner extends Configured implements Tool {
 
@@ -50,12 +27,10 @@ public class HBaseRunner extends Configured implements Tool {
 	static File existingDirs[] = new File[1];
 
 	static boolean jobsSuccess = false;
-	static boolean[] jobsToRun = {true,true,true,false};
+	static boolean[] jobsToRun = {true,true,false,false};
 
 	static int instanceSize = 0, numFolds = 0, numClasses = 0, numClassifiers = 0;
 	static long totalDocuments = 0, totalRecords = 0, totalFeatures = 0, startTime = 0, stopTime = 0, totalStartTime = 0, totalStopTime = 0;
-
-	static Classifier[] models = { new J48(),new PART(),new DecisionTable(),new DecisionStump() ,new NaiveBayes(), new BayesNet(),new KStar(),new ZeroR(),new OneR(),new REPTree()};
 
 	static String parClassifiers = "", docClasses = "";
 
@@ -178,12 +153,11 @@ public class HBaseRunner extends Configured implements Tool {
 
 			MultipleOutputs.addNamedOutput(job2, "FeatureIndexKeyText", TextOutputFormat.class, Text.class, DoubleWritable.class);
 			MultipleOutputs.addNamedOutput(job2, "Seq",SequenceFileOutputFormat.class,Text.class, DoubleWritable.class);
-			//job2.setOutputFormatClass(SequenceFileOutputFormat.class);
-			//SequenceFileOutputFormat.setOutputPath(job2, outputPath2);
+			
 			FileOutputFormat.setOutputPath(job2, outputPath2);
-		    FileOutputFormat.setCompressOutput(job2, true);
-		    FileOutputFormat.setOutputCompressorClass(job2, SnappyCodec.class);
-		    SequenceFileOutputFormat.setOutputCompressionType(job2,CompressionType.BLOCK);
+	//	    FileOutputFormat.setCompressOutput(job2, true);
+	//	    FileOutputFormat.setOutputCompressorClass(job2, SnappyCodec.class);
+	//	    SequenceFileOutputFormat.setOutputCompressionType(job2,CompressionType.BLOCK);
 
 
 			jobsSuccess = job2.waitForCompletion(true);
@@ -237,8 +211,8 @@ public class HBaseRunner extends Configured implements Tool {
 			FileOutputFormat.setOutputPath(job3, outputPath3);
 			SequenceFileOutputFormat.setOutputPath(job3,outputPath3);
 		    FileOutputFormat.setCompressOutput(job3, true);
-		    FileOutputFormat.setOutputCompressorClass(job3, SnappyCodec.class);
-		    SequenceFileOutputFormat.setOutputCompressionType(job3,CompressionType.BLOCK);
+		   // FileOutputFormat.setOutputCompressorClass(job3, SnappyCodec.class);
+		  //  SequenceFileOutputFormat.setOutputCompressionType(job3,CompressionType.BLOCK);
 
 			jobsSuccess = job3.waitForCompletion(true);
 
@@ -367,18 +341,25 @@ public class HBaseRunner extends Configured implements Tool {
 			}
 
 		} catch(Exception e) {
+			br.close();
 			System.out.println("ERROR: Could not read document classes from file: " + outputPath3.toString()+"/DocumentClasses-r-00000");
 			e.printStackTrace();
 			System.out.println("Ending Program.");
 			System.exit(-1);
 		}
+		br.close();
 		System.out.println("Succesfully read in document Classes...");
 		return sb.toString();
 	}
 
 	public static void initPaths(String[] args){
+		
+		File ClassifierModelsDir = new File(args[0]+"/TF_IDF");
+		if(!ClassifierModelsDir.exists())
+		ClassifierModelsDir.mkdirs();
+		
 		docFreqPath = new Path(args[0]+"/feature-sets/ne_all/docfreqs/part-00000");//home/cloudera/Desktop/2-100/feature-sets/ne_all/docfreqs/part-00000			
-		featureSetPath = new Path(args[0]+"feature-sets/ne_all/docfeaturesets-weighted/part-00000");//home/cloudera/Desktop/2-100/feature-sets/ne_all/docfeaturesets-weighted/part-00000
+		featureSetPath = new Path(args[0]+"/feature-sets/ne_all/docfeaturesets-weighted/part-00000");//home/cloudera/Desktop/2-100/feature-sets/ne_all/docfeaturesets-weighted/part-00000
 		classMemPath = new Path(args[0]+"/class-memberships/class-memberships.seq");
 		outputPath = new Path(args[0]+"/TF_IDF/DocumentCounter");///home/cloudera/Documents/TF_IDF
 		outputPath2 = new Path(args[0]+"/TF_IDF/MatrixIntermediateFormat");// /home/cloudera/Documents/TF_IDF
@@ -418,6 +399,8 @@ public class HBaseRunner extends Configured implements Tool {
 
 		public void setup(Context context) {
 			System.out.println("\n******** Processing TD_IDF_Reducer ********\n");
+			mos = new MultipleOutputs<Text,DoubleWritable>(context);
+
 		}
 
 		protected void cleanup(Context context) throws IOException, InterruptedException {
@@ -480,6 +463,7 @@ public class HBaseRunner extends Configured implements Tool {
 	 * when Hadoop outputs new data
 	 */
 	public static void deleteDirs(File[] existingDirs) throws IOException{
+		System.out.println("Deleting Method is Called");
 		boolean filesExists = false;
 		String fileStr = "";
 		for(int k = 0; k < existingDirs.length; k++){
@@ -506,6 +490,7 @@ public class HBaseRunner extends Configured implements Tool {
 				//System.exit(0);
 
 			}
+			scan.close();
 		}
 
 

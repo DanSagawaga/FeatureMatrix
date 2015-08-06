@@ -331,21 +331,6 @@ public class Job4_Mapper extends Mapper<Text, Text, IntWritable, Text>{
 
 	}
 
-	public static void setOptions(String[] classifiersPar){
 
-		String[] splitter = null;
-		for(int k = 0; k < classifiersToBuildNames.length; k++){
-			splitter = classifiersToBuildNames[k].split(",");
-			classifiersToBuildNames[k] = splitter[0];
-			//OptionHandler x = new OptionHandler();
-
-			//	(new OptionHandler) models[classifierIndexMap.get(classifiersToBuildNames[k])] = null;
-
-
-
-		}
-		//	models[classifierIndexMap.get(classifiersToBuildNames[k])]
-
-	}
 
 }
