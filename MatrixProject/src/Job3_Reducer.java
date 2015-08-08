@@ -12,7 +12,7 @@ import org.apache.hadoop.mapreduce.lib.output.MultipleOutputs;
 
 public class Job3_Reducer extends Reducer<CompositeKey,Text,Text,Text>{
 
-	int totalDocuments = 0, numFolds = 0, numDocsInFold =0, currentPartition = 0, remainderCount = 0;
+	int totalDocuments = 0, numFolds = 0, numDocsInFold =0, remainderCount = 0;
 	long docCounter = 0;
 	int[] foldDocCount = null;
 	static HashMap<String,String> classMap = new HashMap<String,String>();
@@ -47,8 +47,8 @@ public class Job3_Reducer extends Reducer<CompositeKey,Text,Text,Text>{
 			else
 				featureList +=  value.toString() + "\n";
 		}
-		
-	//	System.out.println("Document: "+ DocID.getPrimaryKey());
+
+		//	System.out.println("Document: "+ DocID.getPrimaryKey());
 
 		//Adds all Documnet classes to map so they can be written out for later use
 		if(!classMap.containsKey(classifier))
@@ -58,49 +58,24 @@ public class Job3_Reducer extends Reducer<CompositeKey,Text,Text,Text>{
 			System.out.println("Document: "+ DocID.getPrimaryKey()+ " has 0 features | Has been ommited from matrix.");
 		}
 		/*
-		 * Partitions the matrix into n test folds. 
+		 * Writes n (number of Folds) matrices
 		 */
 		else{
 			context.getCounter(Job3_Reducer_Counter.LINES).increment(1);//increments the counter so it can be used as indexer
 			docCounter = context.getCounter(Job3_Reducer_Counter.LINES).getValue();
 
-			mos.write("FullMatrix",new Text(DocID.getPrimaryKey()+"\t"+classifier), new Text(featureList));
+			for(int k = 0; k < numFolds; k++)
+				mos.write("MatrixTrainingFold"+k,new Text(DocID.getPrimaryKey()+"\t"+classifier), new Text(featureList));
 
-			if(currentPartition < numFolds){
-				for(int k = 0; k < numFolds; k++){
-					if(k != currentPartition){
-						mos.write("MatrixTrainingFold"+k,new Text(DocID.getPrimaryKey()+"\t"+classifier), new Text(featureList));
-						//System.out.println(numFolds+" were created");
-						foldDocCount[k]++;
-					}
-				}
-			}
-			if(docCounter%numDocsInFold == 0){
-				currentPartition++;
-			}
-			/*
-			 * Partitions the remainder documents around 
-			 */
-			if(currentPartition > numFolds -1){
-				mos.write("MatrixTrainingFold"+remainderCount,new Text(DocID.getPrimaryKey()+"\t"+classifier), new Text(featureList));
-				foldDocCount[remainderCount]++;
-				remainderCount++;
-			}
-			if(remainderCount == numFolds)
-				remainderCount = 0;
 		}
-
 	}
 
 	protected void cleanup(Context context) throws IOException, InterruptedException {
-		
+
 		for (String value : classMap.values()) {
 			mos.write("DocumentClasses",new Text(value), new Text(""));
 		}
 		mos.close();
-		System.out.println(numFolds+" were created");
-		for(int k=0; k < numFolds; k++){
-			System.out.println("Fold: "+k+" contains "+foldDocCount[k]);
-		}
+		
 	}
 }

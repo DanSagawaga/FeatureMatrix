@@ -29,7 +29,7 @@ import weka.core.FastVector;
 import weka.core.Instances;
 import weka.core.SparseInstance;
 import weka.core.OptionHandler;
-public class Job4_Mapper extends Mapper<Text, Text, IntWritable, Text>{
+public class Job4_Mapper extends Mapper<Text, Text, Text, Text>{
 
 	enum Job4_Mapper_Counter { LINES }
 	FastVector<Attribute> fvWekaAttributes = new FastVector<Attribute>();
@@ -38,8 +38,8 @@ public class Job4_Mapper extends Mapper<Text, Text, IntWritable, Text>{
 	static HashMap<String,String> classifierIndexMap = null;
 
 
-	int totalDocuments = 0, mapperNum = 0, totalFeatures = 0,numFolds = 0, numDocsInFold = 0, currentPartition = 0, tempCount = 0;;
-	int[] mapWriteCount = new int[10];
+	int totalDocuments = 0, mapperNum = 0, totalFeatures = 0,numFolds = 0, numDocsInFold = 0, currentPartition = 0,
+			trainedDocsCount = 0, mapWriteCount = 0, remainderCount = 0;
 
 	static String outputPath = null, docClasses = null;
 	static String[] classifiersToBuildNames = null, classifierOptions = null;
@@ -67,7 +67,7 @@ public class Job4_Mapper extends Mapper<Text, Text, IntWritable, Text>{
 		indexClassifierBank();
 		initClassifiers();
 
-		
+
 		System.out.println("\n****************** Processing Job 4 Mapper: "+mapperNum+ " ******************\n");
 
 
@@ -87,7 +87,7 @@ public class Job4_Mapper extends Mapper<Text, Text, IntWritable, Text>{
 		for(int k = 0; k < splitter.length; k++){
 			classNominalVal.addElement(splitter[k].trim());
 			classNominalMap.put(splitter[k].trim(), 1.0 / (k+1.0));
-			System.out.println(classNominalMap.get(splitter[k].trim()));
+		//	System.out.println(classNominalMap.get(splitter[k].trim()));
 		}
 
 		fvWekaAttributes.addElement( new Attribute("Class Attribute", classNominalVal));
@@ -96,7 +96,7 @@ public class Job4_Mapper extends Mapper<Text, Text, IntWritable, Text>{
 			//tempSet = new Instances(dataset);
 
 			dataset.setClassIndex(fvWekaAttributes.size()-1);
-			System.out.println(dataset.classAttribute().toString());
+		//	System.out.println(dataset.classAttribute().toString());
 			//	System.out.println(dataset.toSummaryString());
 
 		}catch(Exception e){
@@ -113,94 +113,69 @@ public class Job4_Mapper extends Mapper<Text, Text, IntWritable, Text>{
 		//	System.out.println("Mapper " + mapperNum + "\t" +docID_Class_Text.toString());
 
 
-		String[] lines = null, splitLine = null; 
-		String instanceClass = null;
+		if(currentPartition != mapperNum && currentPartition < numFolds ){
 
-		double[] InstanceValues = null;
-		int[] InstanceIndices = null;
+			String[] lines = null, splitLine = null; 
+			String instanceClass = null;
 
-		dataset.setClassIndex(fvWekaAttributes.size()-1);
+			double[] InstanceValues = null;
+			int[] InstanceIndices = null;
 
-		splitLine = docID_Class_Text.toString().split("\t");
-		instanceClass = splitLine[1];
+			dataset.setClassIndex(fvWekaAttributes.size()-1);
 
-		lines = feature_Set.toString().split("\n");
+			splitLine = docID_Class_Text.toString().split("\t");
+			instanceClass = splitLine[1];
 
-		Arrays.sort(lines, new Comparator<String>() {
-			@Override
-			public int compare(String par1, String par2) {
-				int index1 = 0, index2 = 0;
-				String[] splitter = par1.split("\t");
-				index1 = Integer.parseInt(splitter[0]);
-				splitter = par2.split("\t");
-				index2 = Integer.parseInt(splitter[0]);
-				return Integer.valueOf(index1).compareTo(Integer.valueOf(index2));
+			lines = feature_Set.toString().split("\n");
+
+			InstanceValues = new double[lines.length];
+			InstanceIndices = new int[lines.length];
+
+			for(int k = 0; k < lines.length; k++){
+				splitLine = lines[k].split("\t");
+				InstanceIndices[k] = Integer.parseInt(splitLine[0]);
+				InstanceValues[k] = Double.parseDouble(splitLine[1]);
 			}
-		});
 
-		InstanceValues = new double[lines.length];
-		InstanceIndices = new int[lines.length];
+			/*
+			 * Builds Instance Row From the Value in the Loop
+			 */
+			SparseInstance instanceRow = new SparseInstance(1.0,InstanceValues,InstanceIndices,fvWekaAttributes.size()-1);
 
-		for(int k = 0; k < lines.length; k++){
-			splitLine = lines[k].split("\t");
-			InstanceIndices[k] = Integer.parseInt(splitLine[0]);
-			InstanceValues[k] = Double.parseDouble(splitLine[1]);
+			instanceRow.setValue(fvWekaAttributes.size()-1, classNominalMap.get(instanceClass));
+			dataset.add(instanceRow);	
+			trainedDocsCount++;
+
 		}
-
-		/*
-		 * Builds Instance Row From the Value in the Loop
-		 */
-		SparseInstance instanceRow = new SparseInstance(1.0,InstanceValues,InstanceIndices,fvWekaAttributes.size()-1);
-
-		instanceRow.setValue(fvWekaAttributes.size()-1, classNominalMap.get(instanceClass));
-
-
-		dataset.add(instanceRow);	
-
+		else if(currentPartition < numFolds){
+			context.write(new Text(""+mapperNum), new Text(docID_Class_Text.toString() + "\n"+feature_Set.toString()));
+			mapWriteCount++;
+		}
 		/*
 		 * The First two mappers write out collectively the entire matrix to the reducers for the test and evaluation phase of the models.
 		 * The rest of the mappers write out their remainders that were evenly partitioned in the Job 3 Reducer
 		 */
-		if(mapperNum==9){
-			if(docCounter%numDocsInFold != 0){
-				if(mapperNum - 1 == currentPartition){
-					context.write(new IntWritable(0), new Text(docID_Class_Text.toString() + "\n"+feature_Set.toString()));
-					mapWriteCount[mapperNum]++;
-				}
-			}
-			else{
-				if(mapperNum -1 == currentPartition-1){
-					context.write(new IntWritable(0), new Text(docID_Class_Text.toString() + "\n"+feature_Set.toString()));
-					mapWriteCount[mapperNum]++;
-				}
-				currentPartition++;
+		
+		if(docCounter > numDocsInFold*numFolds){
+			remainderCount = (int)(docCounter - (numDocsInFold*numFolds));
+			
+			if(remainderCount >(numFolds -1))
+				remainderCount = 0;
+			
+			if(remainderCount - mapperNum == 0){
+				context.write(new Text(""+mapperNum), new Text(docID_Class_Text.toString() + "\n"+feature_Set.toString()));
+				mapWriteCount++;	
 			}
 		}
-
-		else if(docCounter%numDocsInFold != 0){
-			if(mapperNum == currentPartition){
-				context.write(new IntWritable(currentPartition+1), new Text(docID_Class_Text.toString() + "\n"+feature_Set.toString()));
-				mapWriteCount[mapperNum]++;
-			}
-		}
-		else{
-			if(mapperNum == currentPartition){
-				context.write(new IntWritable(currentPartition+1), new Text(docID_Class_Text.toString() + "\n"+feature_Set.toString()));
-				mapWriteCount[mapperNum]++;
-			}
+		
+		if(docCounter%numDocsInFold == 0)
 			currentPartition++;
-		}
-
-		if(docCounter > numDocsInFold * (numFolds -1)){
-			context.write(new IntWritable(mapperNum), new Text(docID_Class_Text.toString() + "\n"+feature_Set.toString()));
-			mapWriteCount[mapperNum]++;
-		}
-
+		
 
 	}
 	protected void cleanup(Context context) throws IOException, InterruptedException {
 
-		System.out.println("Mapper "+ mapperNum + " | wrote out "+mapWriteCount[mapperNum] + " instances\n");
+		System.out.println("Mapper "+ mapperNum + " | Trained "+trainedDocsCount+" | Wrote out "+mapWriteCount + " instances\n");
 
 		Configuration conf = context.getConfiguration();
 		outputPath = conf.get("modelsPath");
@@ -239,7 +214,7 @@ public class Job4_Mapper extends Mapper<Text, Text, IntWritable, Text>{
 		for(int k = 0; k < classifiersToBuildNames.length; k++){
 			splitter = classifiersToBuildNames[k].split(",");
 			if(splitter.length > 1)
-			classifierIndexMap.put(splitter[0],splitter[1]);
+				classifierIndexMap.put(splitter[0],splitter[1]);
 			else
 				classifierIndexMap.put(splitter[0],"");
 		}
@@ -247,7 +222,7 @@ public class Job4_Mapper extends Mapper<Text, Text, IntWritable, Text>{
 	}
 
 	public static void initClassifiers(){
-		
+
 		models = new Classifier[classifiersToBuildNames.length];
 		int modelsIndex = 0;
 		J48 j48 = null;

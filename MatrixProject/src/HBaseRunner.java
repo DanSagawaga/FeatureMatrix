@@ -27,7 +27,7 @@ public class HBaseRunner extends Configured implements Tool {
 	static File existingDirs[] = new File[1];
 
 	static boolean jobsSuccess = false;
-	static boolean[] jobsToRun = {true,true,false,false};
+	static boolean[] jobsToRun = {true,true,true,true};
 
 	static int instanceSize = 0, numFolds = 0, numClasses = 0, numClassifiers = 0;
 	static long totalDocuments = 0, totalRecords = 0, totalFeatures = 0, startTime = 0, stopTime = 0, totalStartTime = 0, totalStopTime = 0;
@@ -204,13 +204,12 @@ public class HBaseRunner extends Configured implements Tool {
 			for(int k = 0; k < numFolds; k++)
 				MultipleOutputs.addNamedOutput(job3, "MatrixTrainingFold"+k, SequenceFileOutputFormat.class, Text.class, Text.class);
 
-			MultipleOutputs.addNamedOutput(job3, "FullMatrix", TextOutputFormat.class, Text.class, Text.class);
 			MultipleOutputs.addNamedOutput(job3, "DocumentClasses", TextOutputFormat.class, Text.class, Text.class);
 
 
 			FileOutputFormat.setOutputPath(job3, outputPath3);
 			SequenceFileOutputFormat.setOutputPath(job3,outputPath3);
-		    FileOutputFormat.setCompressOutput(job3, true);
+		  //  FileOutputFormat.setCompressOutput(job3, true);
 		   // FileOutputFormat.setOutputCompressorClass(job3, SnappyCodec.class);
 		  //  SequenceFileOutputFormat.setOutputCompressionType(job3,CompressionType.BLOCK);
 
@@ -251,19 +250,20 @@ public class HBaseRunner extends Configured implements Tool {
 				MultipleInputs.addInputPath(job4, new Path (outputPath3 + "/MatrixTrainingFold"+k+"-r-00000"), SequenceFileInputFormat.class, Job4_Mapper.class);
 
 
-			job4.setMapOutputKeyClass(IntWritable.class);
+			job4.setMapOutputKeyClass(Text.class);
 			job4.setMapOutputValueClass(Text.class);
 			//job4.setNumReduceTasks(0);
+			job4.setCombinerClass(Job4_Combiner.class);
 			job4.setReducerClass(Job4_Reducer.class);
-			job4.setNumReduceTasks(numFolds);
+			//job4.setNumReduceTasks(numFolds);
 
 			SequenceFileInputFormat.addInputPath(job4, outputPath3);
 
 			job4.setOutputFormatClass(TextOutputFormat.class);
 			FileOutputFormat.setOutputPath(job4, outputPath4);
 
-			for(int k = 0; k < numClassifiers; k++)
-				MultipleOutputs.addNamedOutput(job4, "ReducerModel"+k,TextOutputFormat.class,Text.class, Text.class);
+			//for(int k = 0; k < numFolds; k++)
+			//	MultipleOutputs.addNamedOutput(job4, "ReducerResult"+k,TextOutputFormat.class,Text.class, Text.class);
 			//	MultipleOutputs.addNamedOutput(job4, "MatrixFold1",TextOutputFormat.class,Text.class, Text.class);
 
 			jobsSuccess = job4.waitForCompletion(true);

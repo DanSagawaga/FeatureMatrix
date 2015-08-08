@@ -5,13 +5,7 @@ import java.io.IOException;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.io.WritableUtils;
 
-/**
- * Stock key. This key is a composite key. The "natural"
- * key is the primaryKey. The secondary sort will be performed
- * against the secondaryKey.
- * @author Jee Vang
- *
- */
+
 public class CompositeKey implements WritableComparable<CompositeKey> {
 
 	private String primaryKey;

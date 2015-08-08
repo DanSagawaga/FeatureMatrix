@@ -34,26 +34,26 @@ import weka.core.Attribute;
 import weka.core.FastVector;
 import weka.core.Instances;
 import weka.core.SparseInstance;
+
 import org.apache.hadoop.mapreduce.lib.output.MultipleOutputs;
 
 import weka.classifiers.AggregateableEvaluation;
 import weka.classifiers.Evaluation;
 
 
-public class Job4_Reducer extends Reducer <IntWritable,Text,Text,Text> {
+public class Job4_Reducer extends Reducer <Text,Text,Text,Text> {
 
-	static String[] classifiersToEvalNames = null;
+	static String[] classifierNames = null;
+	ArrayList<String>[] resultModelsMatrix = null;
+	double[] avgModelsF1Scores = null;
 	static String outputPath = null, docClasses = null;
-	static Classifier[] classifierModels = null;
-	static int reducerNum = 0, totalFeatures = 0, numClasses = 0;
-	AggregateableEvaluation[] eval = null;
-	Evaluation tempEval = null;
+	static int reducerNum = 0, totalFeatures = 0, numClasses = 0, numFolds = 0, keyCount = 0;
 
 	static Instances dataset = null, tempSet = null;
 
 	FastVector<Attribute> fvWekaAttributes = new FastVector<Attribute>();
 	FastVector<String> classNominalVal = null;
-	HashMap<String,Double> classNominalMap = null;
+	HashMap<String,Integer> classifierIndexMap = null;
 	MultipleOutputs<Text, Text> mos;
 
 
@@ -71,187 +71,84 @@ public class Job4_Reducer extends Reducer <IntWritable,Text,Text,Text> {
 		docClasses = conf.get("docClasses");
 		numClasses = Integer.parseInt(conf.get("numClasses"));
 		totalFeatures = Integer.parseInt(conf.get("totalFeatures"));
+		numFolds = Integer.parseInt(conf.get("numFolds"));
+		classifierNames = conf.get("parClassifiers").split("\t");
 
-		classifiersToEvalNames = conf.get("parClassifiers").split("\t");
-		loadClassifiers(classifiersToEvalNames);
-		/*
-		 * Creates Array of attributes to make into the instance data
-		 */
-		for(int k =0; k < totalFeatures; k++)
-			fvWekaAttributes.addElement(new Attribute("Feature "+ k));
+		resultModelsMatrix = new ArrayList<String>[numFolds]();
+		avgModelsF1Scores = new double[classifierNames.length];
 
-
-		splitter = docClasses.split("\n");
-		classNominalVal = new FastVector<String>(splitter.length);
-		classNominalMap = new HashMap<String,Double>(splitter.length);
-
-
-		/*
-		 * populates FastVector list to add as class attribute to the dataset
-		 * populates HashMap to compare each document's class 
-		 */
-		for(int k = 0; k < splitter.length; k++){
-			classNominalVal.addElement(splitter[k].trim());
-			classNominalMap.put(splitter[k].trim(), 1.0 / (k+1.0));
-			System.out.println(classNominalMap.get(splitter[k].trim()));
-		}
-
-
-		fvWekaAttributes.addElement( new Attribute("Class Attribute", classNominalVal));
-		try{
-			dataset = new Instances("FeatureInstance",fvWekaAttributes,fvWekaAttributes.size()-1); 	
-			dataset.setClassIndex(fvWekaAttributes.size()-1);
-			System.out.println(dataset.classAttribute().toString());
-
-			eval = new AggregateableEvaluation[classifiersToEvalNames.length];
-
-			for(int k = 0; k < classifierModels.length; k++)
-				eval[k] = new AggregateableEvaluation(dataset);
-
-
-		}catch(Exception e){
-			e.printStackTrace();
-		}
-
+		classifierIndexMap = new HashMap<String,Integer>(classifierNames.length);
 
 
 	}
 
-	public void reduce(IntWritable key, Iterable<Text> values, Context context)throws IOException , InterruptedException{
+	public void reduce(Text key, Iterable<Text> values, Context context)throws IOException , InterruptedException{
 
+		//	System.out.println(key.toString());
+		//replaces the classifier name string values with the order in which they come from the reducer for later use
+		//	classifierNames[keyCount] = key.toString();
+		if(!classifierIndexMap.containsKey(key.toString()))
+			classifierIndexMap.put(key.toString(),keyCount);
+
+		String[] splitter = null;
+
+		double FScoreAvg = 0;
+		int numClassifiers = 0;
 		int tempCount = 0;
+		for(Text value: values){
+	
+			splitter = value.toString().split("\n",2);
+			if(classifierIndexMap.containsKey(key.toString())){
+				avgModelsF1Scores[classifierIndexMap.get(key.toString())] += Double.parseDouble(splitter[0]);
+				resultModelsMatrix[classifierIndexMap.get(key.toString())][tempCount] = splitter[1];
+			}
+			else{
+				avgModelsF1Scores[keyCount] += Double.parseDouble(splitter[0]);
+				resultModelsMatrix[keyCount][tempCount] = splitter[1];
+				keyCount++;	
 
-		System.out.println("Reducer Key" + key.toString());
-
-		String[] lines = null, splitLine = null; 
-		String instanceClass = null;
-
-		double[] InstanceValues = null;
-		int[] InstanceIndices = null;
-
-		dataset.setClassIndex(fvWekaAttributes.size()-1);
-
-
-		for(Text val:values){
+			}
 			tempCount++;
-			lines = val.toString().split("\n");
-			splitLine = lines[0].split("\t");
-			instanceClass = splitLine[1];
-
-
-
-			lines[0] = "0";
-			Arrays.sort(lines, new Comparator<String>() {
-				@Override
-				public int compare(String o1, String o2) {
-					String[] splitStr = o1.split("\t");
-					int index1 = Integer.parseInt(splitStr[0]);
-					splitStr = o2.split("\t");
-					int index2 = Integer.parseInt(splitStr[0]);
-					if(index1 < index2)
-						return -1;
-					if(index2 > index1)
-						return 1;
-					else return 0;
-				}
-			});
-
-			
-			InstanceValues = new double[lines.length-1];
-			InstanceIndices = new int[lines.length-1];
-
-			for(int k = 1; k < lines.length; k++){
-				splitLine = lines[k].split("\t");
-				InstanceIndices[k-1] = Integer.parseInt(splitLine[0]);
-				InstanceValues[k-1] = Double.parseDouble(splitLine[1]);
-			}
-
-			/*
-			 * Builds Instance Row From the Value in the Loop
-			 */
-			SparseInstance instanceRow = new SparseInstance(1.0,InstanceValues,InstanceIndices,totalFeatures + 1);
-
-			instanceRow.setValue(fvWekaAttributes.size()-1, classNominalMap.get(instanceClass));
-			/*
-			if(instanceClass.equals("rec.autos"))
-				instanceRow.setValue(fvWekaAttributes.size()-1, 0.5);
-			else	
-				instanceRow.setValue(fvWekaAttributes.size()-1, 1.0);
-			 */
-			dataset.add(instanceRow);
-			try{
-				for(int k = 0; k < classifierModels.length; k++){
-					tempEval = new Evaluation(dataset);
-					tempEval.evaluateModel(classifierModels[k], dataset);
-					eval[k].aggregate(tempEval);
-				}
-				dataset.delete();
-			}catch(Exception e){
-				e.printStackTrace();
-			}
-
-			//	context.write(new IntWritable(key.get()), new Text(val.toString()));
-
 		}
-
-		//	if(reducerNum == 9)
-		//	System.out.println(dataset.toString());
-		//	System.out.println(tempCount);
+	//	System.out.println("Key |" + key.toString()+"| has " + tempCount + " iterables");
+		avgModelsF1Scores[keyCount] = FScoreAvg / classifierNames.length;
 
 	}
-
-
 
 	protected void cleanup(Context context) throws IOException, InterruptedException {
 
 		mos = new MultipleOutputs<Text,Text>(context);
 
-		ConfusionMatrix[] confMatrices = new ConfusionMatrix[classifierModels.length];
 		try{
-			System.out.println("\nEvaluation for Model: " + classifierModels[0].getClass().getSimpleName() + " | "+ eval[0].pctCorrect());
+		//	for(int k = 0; k < classife)
+		//	System.out.println("Key "+key.toString() +"Value "+ value.toString());
+			int bestClassifierIndex = getBestClassifier();
+			String xmlMatrices = "";
+			//puts all the matrices of the best classifer into a string to output 
+			for(int k = 0; k < numFolds; k++)
+				xmlMatrices += resultModelsMatrix[bestClassifierIndex][k];
 
-			/*
-			for(int k = 0; k < classifierModels.length; k++){
-				double[][] doubleMatrix = eval[k].confusionMatrix();
-				confMatrices[k] = new ConfusionMatrix(classNominalVal.size(),docClasses.split("\n"));
-				for(int j = 0; j < classNominalVal.size(); j++){
-					confMatrices[k].setRow(j,ArrayUtils.toObject( doubleMatrix[j]));
-				}
-			 */
-			for(int k = 0; k < classifierModels.length; k++){
+			context.write(new Text(classifierNames[bestClassifierIndex]+"\n\n"), new Text(xmlMatrices));
 
-				mos.write("ReducerModel"+k,new Text("Model "+ classifierModels[k].getClass().getSimpleName() + "\n"+
-						eval[k].toMatrixString(classifierModels[k].getClass().getSimpleName())),new Text(""));
-			}
-			//matrix.display();
-			//new Text(eval.toMatrixString(reducerClassifier.getClass().getSimpleName()+ " Confusion Matrix")));
+			//mos.write("ReducerResult"+reducerNum, new Text(classifierModels[k].getClass().getSimpleName()+"\n\tF0.5"+"\tF1"+"\tF2\n" +confMatrices[k].getFMeasures()),new Text(""));
+			//new Text("Model "+ classifierModels[k].getClass().getSimpleName() + "\n"+eval[k].toMatrixString(classifierModels[k].getClass().getSimpleName())),new Text(""));
+
 		}catch(Exception e){
 			e.printStackTrace();
 		}
 		mos.close();
 	}
 
-	/*
-	 * Parameter: String[] of the names of the classifiers to be evaluated
-	 * Each String contains the classifier name and their options so they need 
-	 * split in order to just use the classifier name to load the classifiers 
-	 * externally.
-	 */
-	private void loadClassifiers(String[] classifiersPar){
-		
-		String[] splitter = null;
-		System.out.println("\nReading in model for Testing....\n" );
-		try{
-			classifierModels = new Classifier[classifiersPar.length];
-			for(int k = 0; k < classifiersPar.length;k++){
-				splitter = classifiersPar[k].split(",");
-				classifierModels[k] = (Classifier) weka.core.SerializationHelper.read(outputPath+"Models/Mapper_"+reducerNum +"/"+splitter[0].trim()+".model");
-			}
+	private int getBestClassifier(){
 
-		}catch(Exception e){
-			e.printStackTrace();
+		int maxScoreIndex = 0;
+		double maxFScore = 0;
+
+		for(int k = 0; k < avgModelsF1Scores.length; k++){
+			if(avgModelsF1Scores[k] > maxFScore)
+				maxScoreIndex = k;		
 		}
-		System.out.println("\nRead in models succesfully!\n");
+		return maxScoreIndex;
 	}
 
 }
