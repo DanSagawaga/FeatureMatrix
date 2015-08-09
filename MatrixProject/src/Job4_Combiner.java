@@ -157,16 +157,8 @@ public class Job4_Combiner extends Reducer<Text,Text,Text,Text> {
 				e.printStackTrace();
 			}
 
-			//	context.write(new IntWritable(key.get()), new Text(val.toString()));
-
 		}
 
-		//	if(reducerNum == 9)
-		//	System.out.println(dataset.toString());
-		//	System.out.println(tempCount);
-
-		
-		
 	}
 
 
@@ -177,14 +169,10 @@ public class Job4_Combiner extends Reducer<Text,Text,Text,Text> {
 			loadConfusionMatrices();
 
 			for(int k = 0; k < classifierModels.length; k++){
-			System.out.println("\nEvaluation for Model: " + classifierModels[k].getClass().getSimpleName() + " | "+ eval[k].pctCorrect());
+			System.out.println("Evaluation Accurarcy for Model: " + classifierModels[k].getClass().getSimpleName() + " | "+ eval[k].pctCorrect());
 			context.write(new Text(classifierModels[k].getClass().getSimpleName()),
-					new Text(confMatrices[k].getAverageF1Score() + "\n"+"Training Fold " +combinerNum+"\n"+confMatrices[k].xml()));
+					new Text("Training Fold " +combinerNum+"\n"+"F Measure:\t" +confMatrices[k].getAverageF1Score() +"\n"+confMatrices[k].xml()+"\n"));
 			}
-			System.out.println("Wrote out "+ classifierModels.length + " Matrices");
-			//context.write(new Text(classifierModels[bestClassifierIndex].getClass().getSimpleName()+"\n\tF1\n" +confMatrices[bestClassifierIndex].getAverageF1Score()),new Text(""));
-			//mos.write("ReducerResult"+reducerNum, new Text(classifierModels[k].getClass().getSimpleName()+"\n\tF0.5"+"\tF1"+"\tF2\n" +confMatrices[k].getFMeasures()),new Text(""));
-			//new Text("Model "+ classifierModels[k].getClass().getSimpleName() + "\n"+eval[k].toMatrixString(classifierModels[k].getClass().getSimpleName())),new Text(""));
 
 		}catch(Exception e){
 			e.printStackTrace();
@@ -205,7 +193,6 @@ public class Job4_Combiner extends Reducer<Text,Text,Text,Text> {
 		try{
 			classifierModels = new Classifier[classifiersPar.length];
 			for(int k = 0; k < classifiersPar.length;k++){
-				splitter = classifiersPar[k].split(",");
 				classifierModels[k] = (Classifier) weka.core.SerializationHelper.read(outputPath+"Models/Mapper_"+combinerNum +"/"+splitter[0].trim()+".model");
 			}
 
@@ -228,14 +215,5 @@ public class Job4_Combiner extends Reducer<Text,Text,Text,Text> {
 		}	
 	}
 	
-	private int pickBestClassifier(){
-		double bestFMeasure = 0;
-		int index = -1;
-		for(int k = 0; k < confMatrices.length; k++){
-			if(confMatrices[k].getAverageF1Score() > bestFMeasure)
-				index = k;
-		}
-		return index;
-	}
 }
 

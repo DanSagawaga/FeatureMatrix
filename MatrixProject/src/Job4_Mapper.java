@@ -14,16 +14,11 @@ import java.util.*;
 
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import weka.classifiers.Classifier;
-import weka.classifiers.bayes.BayesNet;
-import weka.classifiers.bayes.NaiveBayes;
+import weka.classifiers.bayes.*;
 import weka.classifiers.lazy.KStar;
-import weka.classifiers.rules.DecisionTable;
-import weka.classifiers.rules.OneR;
-import weka.classifiers.rules.PART;
-import weka.classifiers.rules.ZeroR;
-import weka.classifiers.trees.DecisionStump;
-import weka.classifiers.trees.J48;
-import weka.classifiers.trees.REPTree;
+import weka.classifiers.rules.*;
+import weka.classifiers.trees.*;
+import weka.classifiers.functions.*;
 import weka.core.Attribute;
 import weka.core.FastVector;
 import weka.core.Instances;
@@ -235,6 +230,7 @@ public class Job4_Mapper extends Mapper<Text, Text, Text, Text>{
 		OneR oneR = null;
 		ZeroR zeroR = null;
 		REPTree repTree = null;
+		SimpleLogistic SL = null;
 
 		try{
 			if(classifierIndexMap.containsKey("J48")){
@@ -296,6 +292,12 @@ public class Job4_Mapper extends Mapper<Text, Text, Text, Text>{
 				repTree = new REPTree();
 				repTree.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("REPTree")));
 				models[modelsIndex] = repTree;
+				modelsIndex++;
+			}
+			if(classifierIndexMap.containsKey("SimpleLogistic")){
+				SL = new SimpleLogistic();
+				SL.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("SimpleLogistic")));
+				models[modelsIndex] = SL;
 				modelsIndex++;
 			}
 

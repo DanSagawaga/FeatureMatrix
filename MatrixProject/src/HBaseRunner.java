@@ -18,7 +18,8 @@ import java.io.File;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.hadoop.conf.Configured;
-
+import org.apache.hadoop.io.compress.CompressionCodec;
+import org.apache.hadoop.io.compress.CompressionCodecFactory;
 
 
 public class HBaseRunner extends Configured implements Tool {
@@ -38,6 +39,7 @@ public class HBaseRunner extends Configured implements Tool {
 
 	public static void main(String[] args) {
 
+		System.out.println("The Main Method was Called\n");
 		try{
 			numFolds = Integer.parseInt(args[1]);
 
@@ -60,7 +62,6 @@ public class HBaseRunner extends Configured implements Tool {
 			 */
 			initPaths(args);
 			//Recursively deletes exisiting output directories
-			//pickBestModel();
 			deleteDirs(existingDirs);
 
 			ToolRunner.run(new Configuration(), new HBaseRunner(), args);
@@ -155,7 +156,7 @@ public class HBaseRunner extends Configured implements Tool {
 			MultipleOutputs.addNamedOutput(job2, "Seq",SequenceFileOutputFormat.class,Text.class, DoubleWritable.class);
 			
 			FileOutputFormat.setOutputPath(job2, outputPath2);
-	//	    FileOutputFormat.setCompressOutput(job2, true);
+		    FileOutputFormat.setCompressOutput(job2, true);
 	//	    FileOutputFormat.setOutputCompressorClass(job2, SnappyCodec.class);
 	//	    SequenceFileOutputFormat.setOutputCompressionType(job2,CompressionType.BLOCK);
 
@@ -238,6 +239,7 @@ public class HBaseRunner extends Configured implements Tool {
 			conf.set("parClassifiers", parClassifiers);
 			conf.setInt("numClasses", numClasses);
 			conf.set("docClasses",docClasses);
+
 
 			Job job4 = Job.getInstance(conf,"Nth Split Cross Validation"); 
 
