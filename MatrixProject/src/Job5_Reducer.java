@@ -45,8 +45,8 @@ public class Job5_Reducer extends Reducer <Text,Text,Text,Text> {
 
 	static String[] classifierNames = null, classifierOptionsArray =null;
 	ArrayList[] resultModelsMatrix = null;
-	double[] avgModelsF1Scores = null;
-	static String outputPath = null, docClasses = null;
+	String[] modelsClassFScores = null, docClasses = null;
+	static String outputPath = null;
 	static int reducerNum = 0, totalFeatures = 0, numClasses = 0, numFolds = 0, keyCount = 0;
 
 	static Instances dataset = null, tempSet = null;
@@ -68,18 +68,21 @@ public class Job5_Reducer extends Reducer <Text,Text,Text,Text> {
 
 		Configuration conf = context.getConfiguration();
 		outputPath = conf.get("modelsPath");
-		docClasses = conf.get("docClasses");
+		docClasses = conf.get("docClasses").split("\n");
 		numClasses = Integer.parseInt(conf.get("numClasses"));
 		totalFeatures = Integer.parseInt(conf.get("totalFeatures"));
 		numFolds = Integer.parseInt(conf.get("numFolds"));
 		classifierNames = conf.get("parClassifiers").split("\t");
 		classifierOptionsArray = conf.get("parClassifiers").split("\t");
 
+		modelsClassFScores = new String[classifierNames.length];
 		resultModelsMatrix = new ArrayList[classifierNames.length];
-		for(int k =0; k< classifierNames.length;k++)
+		//insantiates both arrays for use 
+		for(int k =0; k< classifierNames.length;k++){
 			resultModelsMatrix[k] = new ArrayList<String>();
+			modelsClassFScores[k] = "";
+		}
 
-		avgModelsF1Scores = new double[classifierNames.length];
 
 		classifierIndexMap = new HashMap<String,Integer>(classifierNames.length);
 
@@ -101,27 +104,30 @@ public class Job5_Reducer extends Reducer <Text,Text,Text,Text> {
 		for(Text value: values){
 
 			splitter = value.toString().split("\n",3);
-			splitter2 = splitter[1].split("\t");
-			
-		//	System.out.println("FScore " + splitter2[1]);
-			
+
+			//	System.out.println("FScore " + splitter2[1]);
+
 			if(classifierIndexMap.containsKey(key.toString())){
-				avgModelsF1Scores[classifierIndexMap.get(key.toString())] += Double.parseDouble(splitter2[1]);
+				modelsClassFScores[classifierIndexMap.get(key.toString())] += splitter[1]+"\n";
+				//System.out.println("Added Class Label Data to Classifier "+ key.toString() + " Index: " + classifierIndexMap.get(key.toString()) + " | " + splitter[1]);
+
 				resultModelsMatrix[classifierIndexMap.get(key.toString())].add(value.toString());
 			}
 			else{
 				classifierIndexMap.put(key.toString(), keyCount);
-				avgModelsF1Scores[keyCount] += Double.parseDouble(splitter2[1]);
+				modelsClassFScores[keyCount] += splitter[1]+"\n";
+				//	System.out.println("Added Class Label Data to Classifier "+ key.toString() + " Index: "+keyCount + " | " + splitter[1]);
+
 				resultModelsMatrix[keyCount].add(value.toString());
 				//arranges the values of the class name array so that it matches the avg score one 
 				String[] tempClassifierOptions = classifierOptionsArray[keyCount].split(",");
 				if(tempClassifierOptions.length == 2){
-			//		System.out.println("Putting classifier "+key.toString()+" in index " + keyCount);
+					//			System.out.println("Putting classifier "+key.toString()+" in index " + keyCount);
 					classifierNames[keyCount] = key.toString() + "| With options "+ tempClassifierOptions[1];
 				}
 				else{
-			//		System.out.println("Putting classifier "+key.toString()+" in index " + keyCount);
-					classifierNames[keyCount] = key.toString() + "| ";
+					//			System.out.println("Putting classifier "+key.toString()+" in index " + keyCount);
+					classifierNames[keyCount] = key.toString();
 				} 
 				keyCount++;	
 
@@ -138,16 +144,29 @@ public class Job5_Reducer extends Reducer <Text,Text,Text,Text> {
 		mos = new MultipleOutputs<Text,Text>(context);
 
 		try{
-			int bestClassifierIndex = getBestClassifierIndex();
-			System.out.println("The Best Index is "+bestClassifierIndex);
-			//sortMatricesArray();
+			//int bestClassifierIndex = getBestClassifierIndex();
+			System.out.println("Number of NumClasses is "+numClasses);
+			String[] bestModelClassFScoresStr = getBestClassesInModels(numClasses);	
 			String xmlMatrices = "";
-			//puts all the matrices of the best classifer into a string to output 
-			for(int k = 0; k < numFolds; k++)
-				xmlMatrices += resultModelsMatrix[bestClassifierIndex].get(k);
 
-			context.write(new Text(classifierNames[bestClassifierIndex]+"\tAvg F score:"+avgModelsF1Scores[bestClassifierIndex]/numFolds
-					+"\n\n"), new Text(xmlMatrices));
+			for(int k = 0; k < bestModelClassFScoresStr.length; k++){
+				String[] tabSplitter = bestModelClassFScoresStr[k].split("\t");
+				int classifierNameIndex = Integer.parseInt(tabSplitter[0]);
+				int foldIndex = Integer.parseInt(tabSplitter[1]);
+				double FScore = Double.parseDouble(tabSplitter[2]);
+				System.out.println("Best Classifier: "+classifierNames[classifierNameIndex] + " | Fold "+getFoldMatrixNumber(classifierNameIndex, foldIndex) +" | "+ docClasses[k] + FScore);
+				context.write(new Text("Best Classifier: "+classifierNames[classifierNameIndex] + " | Fold "+getFoldMatrixNumber(classifierNameIndex, foldIndex) +" | "+ docClasses[k] + FScore),
+						new Text( "\n"+findMatrixFold(classifierNameIndex, foldIndex)));
+			}
+
+
+
+			//puts all the matrices of the best classifer into a string to output 
+			//	for(int k = 0; k < numFolds; k++)
+			//		xmlMatrices += resultModelsMatrix[bestClassifierIndex].get(k);
+
+			//	context.write(new Text(classifierNames[bestClassifierIndex]+"\tAvg F score:"+modelsClassFScores[bestClassifierIndex]
+			//			+"\n\n"), new Text(xmlMatrices));
 
 			//mos.write("ReducerResult"+reducerNum, new Text(classifierModels[k].getClass().getSimpleName()+"\n\tF0.5"+"\tF1"+"\tF2\n" +confMatrices[k].getFMeasures()),new Text(""));
 			//new Text("Model "+ classifierModels[k].getClass().getSimpleName() + "\n"+eval[k].toMatrixString(classifierModels[k].getClass().getSimpleName())),new Text(""));
@@ -158,47 +177,42 @@ public class Job5_Reducer extends Reducer <Text,Text,Text,Text> {
 		mos.close();
 	}
 
-	private int getBestClassifierIndex(){
+	private String[] getBestClassesInModels(int numClassesPar){
 
-		int maxScoreIndex = 0;
-		double maxFScore = 0;
+		String[] bestModelClassFScoresStr = new String[numClassesPar];
+		double[] bestModelClassFScores = new double[numClassesPar];
+		for(int k = 0; k < bestModelClassFScores.length; k++)
+			bestModelClassFScores[k] = 0;
+		double curF1Score = 0;
+		String[] lineSplitter = null, tabSplitter= null;
 
-		for(int k = 0; k < avgModelsF1Scores.length; k++){
-			System.out.println("Avg F score for classifier "+ classifierNames[k] +" "+avgModelsF1Scores[k]/10);
-			if(avgModelsF1Scores[k] > maxFScore){
-				maxFScore = avgModelsF1Scores[k];
-				maxScoreIndex = k;		
-			}
-		}
-		return maxScoreIndex;
-	}
-
-	private void sortMatricesArray(){
-		int bestClassifierIndex = getBestClassifierIndex();
-		String[] tempArrayToSort = new String[numFolds];
-		for(int k = 0; k < tempArrayToSort.length; k++){
-			tempArrayToSort[k] = (String)resultModelsMatrix[bestClassifierIndex].get(k);
-		}
-		
-		Arrays.sort(tempArrayToSort, new Comparator<String>() {
-					@Override
-					public int compare(String par1, String par2) {
-						int index1 = 0, index2 = 0;
-						String[] splitter = par1.split("\n",2);
-						splitter = splitter[0].split(" ");
-						index1 = Integer.parseInt(splitter[3]);
-						
-						splitter = par2.split("\n",2);
-						splitter = splitter[0].split(" ");
-						index2 = Integer.parseInt(splitter[3]);
-						return Integer.valueOf(index1).compareTo(Integer.valueOf(index2));
+		for(int k = 0; k < modelsClassFScores.length; k++){	//K is the classifier Name 
+			lineSplitter = modelsClassFScores[k].split("\n");
+			for(int j = 0; j < lineSplitter.length; j++){//J is the Fold Number 
+				tabSplitter = lineSplitter[j].split("\t");
+				System.out.println("Classifier F score: " + classifierNames[k] + "Fold-"+j+ "\t"+ lineSplitter[j]);
+				for(int i = 0; i < tabSplitter.length; i++){//i is the class index
+					curF1Score = Double.parseDouble(tabSplitter[i]);
+					if(curF1Score > bestModelClassFScores[i]){
+						bestModelClassFScores[i] = curF1Score;
+						bestModelClassFScoresStr[i] = k +"\t"+ j + "\t"+curF1Score;
 					}
-				});
-		resultModelsMatrix[bestClassifierIndex].clear();
-		
-		for(int k = 0; k < tempArrayToSort.length;k++)
-			resultModelsMatrix[bestClassifierIndex].add((Object)tempArrayToSort[k]);
-			
+
+				}
+			}
+
+		}
+		return bestModelClassFScoresStr;
+	}
+	
+	private int getFoldMatrixNumber(int foldArrayIndex, int foldNum){
+		String temp =(String) resultModelsMatrix[foldArrayIndex].get(foldNum);
+		String[] splitter = temp.split("\n");
+		splitter = splitter[0].split(" ");
+		return Integer.parseInt(splitter[2]);
 	}
 
+	private String findMatrixFold(int foldArrayIndex, int foldNum){
+		 return (String)resultModelsMatrix[foldArrayIndex].get(foldNum);
+	}
 }

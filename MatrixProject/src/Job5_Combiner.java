@@ -170,7 +170,8 @@ public class Job5_Combiner extends Reducer<Text,Text,Text,Text> {
 				System.out.println();
 				
 				context.write(new Text(classifierModels[k].getClass().getSimpleName()),
-						new Text("Training Fold " +combinerNum+"\n"+"Accuracy:\t" +confMatrices[k].getAverageF1Score() +"\n"+confMatrices[k].xml()+"\n"));
+						new Text("Training Fold " +combinerNum+"\n"+confMatrices[k].getF1Scores() +"\n"+confMatrices[k].xml()+"\n"));
+			//	System.out.println("Classifier and F scores: "+classifierModels[k].getClass().getSimpleName()+" | " +confMatrices[k].getF1Scores());
 			}
 
 		}catch(Exception e){

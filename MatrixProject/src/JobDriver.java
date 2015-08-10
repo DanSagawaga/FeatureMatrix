@@ -25,6 +25,7 @@ import org.apache.hadoop.conf.Configured;
 public class JobDriver extends Configured implements Tool {
 
 	static int instanceSize = 0, numFolds = 0, numClasses = 0, numClassifiers = 0, randomSeed = 0;
+	static float[] jobTimes = new float[6];
 	static long totalDocuments = 0, totalRecords = 0, totalFeatures = 0, startTime = 0, stopTime = 0, totalStartTime = 0, totalStopTime = 0;
 
 	static String parClassifiers = "", docClasses = "";
@@ -66,7 +67,7 @@ public class JobDriver extends Configured implements Tool {
 			deleteDirs(existingDirs);
 
 			ToolRunner.run(new Configuration(), new JobDriver(), args);
-
+			writeTimesToFile();
 			System.exit(jobsSuccess ? 0 : 1);
 		}
 		catch (Exception e){
@@ -113,6 +114,7 @@ public class JobDriver extends Configured implements Tool {
 			jobsSuccess = job1.waitForCompletion(true);
 			
 			stopTime = System.currentTimeMillis();
+			jobTimes[0] = (stopTime-startTime);
 			System.out.println("********** Job 1 Done. Total Time (ms): " + (stopTime-startTime)+" **********");
 
 		}
@@ -167,6 +169,7 @@ public class JobDriver extends Configured implements Tool {
 
 			jobsSuccess = job2.waitForCompletion(true);
 			stopTime = System.currentTimeMillis();
+			jobTimes[1] = (stopTime-startTime);
 			System.out.println("********** Job 2 Done. Total Time (ms): " + (stopTime-startTime)+" **********");
 		}		
 
@@ -218,6 +221,7 @@ public class JobDriver extends Configured implements Tool {
 			jobsSuccess = job3.waitForCompletion(true);
 
 			stopTime = System.currentTimeMillis();
+			jobTimes[2] = (stopTime-startTime);
 			System.out.println("********** Job 3 Done. Total Time (ms): " + (stopTime-startTime)+" **********");
 
 		}
@@ -257,6 +261,7 @@ public class JobDriver extends Configured implements Tool {
 			jobsSuccess = job4.waitForCompletion(true);
 
 			stopTime = System.currentTimeMillis();
+			jobTimes[3] = (stopTime-startTime);
 			System.out.println("********** Job 4 Done. Total Time (ms): " + (stopTime-startTime)+" **********");
 
 
@@ -311,12 +316,14 @@ public class JobDriver extends Configured implements Tool {
 
 			jobsSuccess = job5.waitForCompletion(true);
 			stopTime = System.currentTimeMillis();
+			jobTimes[4] = (stopTime-startTime);
 			System.out.println("********** Job 4 Done. Total Time (ms): " + (stopTime-startTime)+" **********");
 		}
 
 
 		if(jobsSuccess){
 			totalStopTime = System.currentTimeMillis();
+			jobTimes[5] = (totalStopTime -totalStartTime);
 			System.out.println("********** All Jobs Done. Total Time: " + (totalStopTime -totalStartTime)+" **********");
 			System.out.println("Number of Documents: "+totalDocuments+
 					"\nNumber of Features: "+totalFeatures+
@@ -340,6 +347,7 @@ public class JobDriver extends Configured implements Tool {
 				sb.append(line);
 				sb.append(System.lineSeparator());
 				line = br.readLine();
+				numClasses++;
 			}
 
 		} catch(Exception e) {
@@ -539,5 +547,15 @@ public class JobDriver extends Configured implements Tool {
 	}
 
 
+	public static void writeTimesToFile()throws IOException{
+		
+		PrintWriter writer = new PrintWriter(existingDirs[0].toString()+"/JobTimes.txt", "UTF-8");
+		writer.println("**************************** Total Job Times ****************************");
+		for(int k = 0; k < jobTimes.length -1; k++){
+			writer.println("Job "+k+" Time: " + jobTimes[k]);
+		}
+		writer.println("Total Jobs Time: " + jobTimes[jobTimes.length -1]);
+		writer.close();
+	}
 }
 

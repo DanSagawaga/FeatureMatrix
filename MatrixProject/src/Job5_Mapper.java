@@ -231,6 +231,7 @@ public class Job5_Mapper extends Mapper<Text, Text, Text, Text>{
 		OneR oneR = null;
 		ZeroR zeroR = null;
 		REPTree repTree = null;
+		//SVM Logistic mutlilayerperception randomForest SMO votedPerceptiom 
 
 		try{
 			if(classifierIndexMap.containsKey("J48")){

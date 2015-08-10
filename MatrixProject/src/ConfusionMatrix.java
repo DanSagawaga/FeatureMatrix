@@ -7,14 +7,14 @@ import org.jdom2.Document;
 import org.jdom2.Element;
 import org.jdom2.JDOMException;
 import org.jdom2.input.SAXBuilder;
-import org.la4j.matrix.Matrix;
+import org.la4j.matrix.DenseMatrix;
 import org.la4j.matrix.dense.Basic2DMatrix;
-import org.la4j.vector.Vector;
+import org.la4j.vector.DenseVector;
 import performance.ClassLabelData;
 import utils.Formatting;
 
 public class ConfusionMatrix {
-	private Matrix matrix_;
+	private Basic2DMatrix matrix_;
 	private java.util.Vector<ClassLabelData> classLabelData_ = new java.util.Vector();
 	public static final String XML_CONFUSION_MATRIX_HEADER = "cf";
 	public static final String XML_CONFUSION_MATRIX_SIZE = "msize";
@@ -51,7 +51,7 @@ public class ConfusionMatrix {
 		}
 	}
 
-	public ConfusionMatrix(Matrix matrix, java.util.Vector<ClassLabelData> classLabelData) {
+	public ConfusionMatrix(Basic2DMatrix matrix, java.util.Vector<ClassLabelData> classLabelData) {
 		this.matrix_ = matrix;
 		this.classLabelData_ = classLabelData;
 	}
@@ -205,6 +205,8 @@ public class ConfusionMatrix {
 		}
 	}
 
+	
+	
 	public String getFMeasures(){
 		int classIndex = 0;
 		int upperBoundary = 0;
@@ -221,32 +223,19 @@ public class ConfusionMatrix {
 		return output;
 	}
 	
-	public double getAverageF1Score(){
+	
+	
+	public String getF1Scores(){
 		int classIndex = 0;
-		double avg = 0;
+		String output = "";
 		for (classIndex = 0; classIndex < this.classLabelData_.size(); ++classIndex) {
-			avg += this.classLabelData_.get(classIndex).f1Measure();
-			classIndex++;
+			output += this.classLabelData_.get(classIndex).f1Measure()+ "\t";
 		}
-		return avg/this.classLabelData_.size();
+		return output;
 	}
-	public double getAverageF2Score(){
-		int classIndex = 0;
-		double avg = 0;
-		for (classIndex = 0; classIndex < this.classLabelData_.size(); ++classIndex) {
-			avg += this.classLabelData_.get(classIndex).f2Measure();
-			classIndex++;
-		}
-		return avg/this.classLabelData_.size();
-	}
-	public double getAverageF05Score(){
-		int classIndex = 0;
-		double avg = 0;
-		for (classIndex = 0; classIndex < this.classLabelData_.size(); ++classIndex) {
-			avg += this.classLabelData_.get(classIndex).f05Measure();
-		}
-		return avg/this.classLabelData_.size();
-	}
+	
+	
+	
 
 	public int getTotalElements() {
 		int total = 0;
@@ -313,7 +302,7 @@ public class ConfusionMatrix {
 					for (Element child3 : classLabelDataDefinition.getChildren()) {
 						classLabelData.add(ClassLabelData.createFromXmlString((Element)child3));
 					}
-					return new ConfusionMatrix((Matrix)matrix, classLabelData);
+					return new ConfusionMatrix((Basic2DMatrix)matrix, classLabelData);
 				}
 			}
 		}
