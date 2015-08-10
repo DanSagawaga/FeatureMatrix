@@ -226,6 +226,7 @@ public class ConfusionMatrix {
 		double avg = 0;
 		for (classIndex = 0; classIndex < this.classLabelData_.size(); ++classIndex) {
 			avg += this.classLabelData_.get(classIndex).f1Measure();
+			classIndex++;
 		}
 		return avg/this.classLabelData_.size();
 	}
@@ -234,6 +235,7 @@ public class ConfusionMatrix {
 		double avg = 0;
 		for (classIndex = 0; classIndex < this.classLabelData_.size(); ++classIndex) {
 			avg += this.classLabelData_.get(classIndex).f2Measure();
+			classIndex++;
 		}
 		return avg/this.classLabelData_.size();
 	}

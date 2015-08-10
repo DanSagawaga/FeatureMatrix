@@ -61,11 +61,7 @@ public class Job3_Reducer extends Reducer<CompositeKey,Text,Text,Text>{
 		 * Writes n (number of Folds) matrices
 		 */
 		else{
-			context.getCounter(Job3_Reducer_Counter.LINES).increment(1);//increments the counter so it can be used as indexer
-			docCounter = context.getCounter(Job3_Reducer_Counter.LINES).getValue();
-
-			for(int k = 0; k < numFolds; k++)
-				mos.write("MatrixTrainingFold"+k,new Text(DocID.getPrimaryKey()+"\t"+classifier), new Text(featureList));
+				mos.write("FinalMatrixForm",new Text(DocID.getPrimaryKey()+"\t"+classifier), new Text(featureList));
 
 		}
 	}
