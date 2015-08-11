@@ -36,7 +36,7 @@ public class Job2_DocFreq_Mapper  extends Mapper<Text, Text, CompositeKey, Text>
 	}
 
 	/*
-	 * Simple line read containing the feature and its Inverse Document Frequency 
+	 * Simple line read of the feature and its Inverse Document Frequency 
 	 * The feature is used as the primary key and a -1 is used as the secondary key
 	 */
 	public void map(Text featureText, Text docFreqText, Context context) throws IOException, InterruptedException {
@@ -60,6 +60,7 @@ public class Job2_DocFreq_Mapper  extends Mapper<Text, Text, CompositeKey, Text>
 
 			context.write(new CompositeKey(feature,-1.0),
 					new Text("IDF_Flag"+"\t"+context.getCounter(Counters.LINES).getValue()+"\t"+IDF));
+			
 			context.getCounter(Counters.LINES).increment(1);//increments the counter so it can be used as indexer
 			//  System.out.println("Feature: " + feature + " Index: " + context.getCounter(Counters.LINES).getValue() + " IDF: " + IDF)
 		}
