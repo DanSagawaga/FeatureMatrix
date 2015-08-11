@@ -67,6 +67,10 @@ public class JobDriver extends Configured implements Tool {
 			deleteDirs(existingDirs);
 
 			ToolRunner.run(new Configuration(), new JobDriver(), args);
+			System.out.println("Number of Documents: "+totalDocuments
+					+"\nNumber of Features: "+totalFeatures
+					+"\nNumber of Records: "+totalRecords
+					+"\nNumber of Classes: "+numClasses);
 			writeTimesToFile();
 			System.exit(jobsSuccess ? 0 : 1);
 		}
@@ -280,7 +284,7 @@ public class JobDriver extends Configured implements Tool {
 			docClasses = readDocumentClasses();
 			startTime = System.currentTimeMillis();
 
-			conf.setLong("totalFeatures", 2180);
+			conf.setLong("totalFeatures", totalFeatures);
 			conf.set("modelsPath", args[0]+"/TF_IDF/ClassifierModels/");
 			conf.set("parClassifiers", parClassifiers);
 			conf.setInt("numClasses", numClasses);
@@ -325,9 +329,6 @@ public class JobDriver extends Configured implements Tool {
 			totalStopTime = System.currentTimeMillis();
 			jobTimes[5] = (totalStopTime -totalStartTime);
 			System.out.println("********** All Jobs Done. Total Time: " + (totalStopTime -totalStartTime)+" **********");
-			System.out.println("Number of Documents: "+totalDocuments+
-					"\nNumber of Features: "+totalFeatures+
-					"\nNumber of Records: "+totalRecords);
 			return 0;
 		}
 		else return 1;
@@ -375,7 +376,7 @@ public class JobDriver extends Configured implements Tool {
 		outputPath2 = new Path(args[0]+"/TF_IDF/MatrixIntermediateFormat");// /home/cloudera/Documents/TF_IDF
 		outputPath3 = new Path(args[0]+"/TF_IDF/MatrixFinalForm");///home/cloudera/Documents/TF_IDF
 		outputPath4 = new Path(args[0]+"/TF_IDF/RandomizedMatrices");///home/cloudera/Documents/TF_IDF
-		outputPath5 = new Path(args[0]+"/TF_IDF/ClassifierModels");///home/cloudera/Documents/TF_IDF	
+		outputPath5 = new Path(args[0]+"/TF_IDF/FinalResults");///home/cloudera/Documents/TF_IDF	
 		existingDirs[0] = new File(args[0] + "/TF_IDF");
 	}
 
@@ -552,9 +553,9 @@ public class JobDriver extends Configured implements Tool {
 		PrintWriter writer = new PrintWriter(existingDirs[0].toString()+"/JobTimes.txt", "UTF-8");
 		writer.println("**************************** Total Job Times ****************************");
 		for(int k = 0; k < jobTimes.length -1; k++){
-			writer.println("Job "+k+" Time: " + jobTimes[k]);
+			writer.println("Job "+(k+1)+" Time: " + (jobTimes[k]/1000.00)+"s");
 		}
-		writer.println("Total Jobs Time: " + jobTimes[jobTimes.length -1]);
+		writer.println("Total Jobs Time: " + (jobTimes[jobTimes.length -1]/1000.00)+"s");
 		writer.close();
 	}
 }

@@ -75,7 +75,7 @@ public class Job5_Combiner extends Reducer<Text,Text,Text,Text> {
 		 */
 		for(int k = 0; k < splitter.length; k++){
 			classNominalVal.addElement(splitter[k].trim());
-			classNominalMap.put(splitter[k].trim(), 1.0 / (k+1.0));
+			classNominalMap.put(splitter[k].trim(), k+0.1);
 			//	System.out.println(classNominalMap.get(splitter[k].trim()));
 		}
 
@@ -138,7 +138,7 @@ public class Job5_Combiner extends Reducer<Text,Text,Text,Text> {
 			SparseInstance instanceRow = new SparseInstance(1.0,InstanceValues,InstanceIndices,totalFeatures + 1);
 
 			instanceRow.setValue(fvWekaAttributes.size()-1, classNominalMap.get(instanceClass));
-
+			
 			dataset.add(instanceRow);
 			try{
 				for(int k = 0; k < classifierModels.length; k++){
@@ -205,12 +205,13 @@ public class Job5_Combiner extends Reducer<Text,Text,Text,Text> {
 	/*
 	 * Initializes ConfusionMatrix objects from the resulting evaluations 
 	 */
-	private void loadConfusionMatrices(){		
-		confMatrices = new ConfusionMatrix[classifierModels.length];
-		for(int k = 0; k < classifierModels.length; k++){
+	private void loadConfusionMatrices()throws Exception{		
+		confMatrices = new ConfusionMatrix[classifierModels.length];//Initializes Confusion Matrix array
+		
+		for(int k = 0; k < classifierModels.length; k++){	//loops through confusion matrix array
 			double[][] doubleMatrix = eval[k].confusionMatrix();
 			confMatrices[k] = new ConfusionMatrix(classNominalVal.size(),docClasses.split("\n"));
-			for(int j = 0; j < classNominalVal.size(); j++){
+			for(int j = 0; j < numClasses; j++){
 				confMatrices[k].setRow(j,ArrayUtils.toObject(doubleMatrix[j]));
 			}
 		}	
