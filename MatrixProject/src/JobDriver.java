@@ -18,6 +18,9 @@ import java.io.File;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.fs.FileSystem;
+
+
 //import org.apache.hadoop.io.compress.CompressionCodec;
 //import org.apache.hadoop.io.compress.CompressionCodecFactory;
 
@@ -31,12 +34,12 @@ public class JobDriver extends Configured implements Tool {
 	static String parClassifiers = "", docClasses = "";
 	static boolean jobsSuccess = false;
 	//boolean array to control which jobs to run, for testing purposes
-	static boolean[] jobsToRun = {true,true,true,true,true};
+	static boolean[] jobsToRun = {true,true,false,false,false};
 
 
 	static Path docFreqPath = null, featureSetPath = null, classMemPath = null, outputPath = null,
 			outputPath2 = null,outputPath3 = null,outputPath4 = null, outputPath5 = null;
-	static File existingDirs[] = new File[1];
+	static File existingDirs[] = null;
 
 	/*
 	 * The Main method initializes the main parameters and calls toolRunner to run the jobs
@@ -363,7 +366,7 @@ public class JobDriver extends Configured implements Tool {
 		return sb.toString();
 	}
 
-	public static void initPaths(String[] args){
+	public static void initPaths(String[] args)throws Exception{
 
 		File ClassifierModelsDir = new File(args[0]+"/TF_IDF");
 		if(!ClassifierModelsDir.exists())
@@ -377,7 +380,12 @@ public class JobDriver extends Configured implements Tool {
 		outputPath3 = new Path(args[0]+"/TF_IDF/MatrixFinalForm");///home/cloudera/Documents/TF_IDF
 		outputPath4 = new Path(args[0]+"/TF_IDF/RandomizedMatrices");///home/cloudera/Documents/TF_IDF
 		outputPath5 = new Path(args[0]+"/TF_IDF/FinalResults");///home/cloudera/Documents/TF_IDF	
+		
+		existingDirs = new File[1];
 		existingDirs[0] = new File(args[0] + "/TF_IDF");
+		Configuration config = new Configuration();
+		FileSystem hdfs = FileSystem.get(config);
+		hdfs.delete(outputPath5,true);
 	}
 
 	public static class DocCounterMapper extends Mapper<Text, Text, Text, IntWritable> { 
@@ -476,6 +484,9 @@ public class JobDriver extends Configured implements Tool {
 	 */
 	public static void deleteDirs(File[] existingDirs) throws IOException{
 		System.out.println("Deleting Method is Called");
+		
+
+		
 		boolean filesExists = false;
 		String fileStr = "";
 		for(int k = 0; k < existingDirs.length; k++){
