@@ -3,6 +3,8 @@ import java.io.IOException;
 import java.util.*;
 
 import org.apache.commons.lang.ArrayUtils;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
@@ -28,7 +30,7 @@ import weka.core.FastVector;
 public class Job5_Combiner extends Reducer<Text,Text,Text,Text> {
 
 	static String[] classifiersToEvalNames = null;
-	static String outputPath = null, docClasses = null;
+	static String docClasses = null;
 	static Classifier[] classifierModels = null;
 	ConfusionMatrix[] confMatrices = null;
 	static int combinerNum = 0, totalFeatures = 0, numClasses = 0;
@@ -51,13 +53,12 @@ public class Job5_Combiner extends Reducer<Text,Text,Text,Text> {
 		System.out.println("\n****************** Processing Job 5 Combiner: "+combinerNum+ " ******************\n");
 
 		Configuration conf = context.getConfiguration();
-		outputPath = conf.get("modelsPath");
 		docClasses = conf.get("docClasses");
 		numClasses = Integer.parseInt(conf.get("numClasses"));
 		totalFeatures = Integer.parseInt(conf.get("totalFeatures"));
 
 		classifiersToEvalNames = conf.get("parClassifiers").split("\t");
-		loadClassifiers(classifiersToEvalNames);
+		loadClassifiers(classifiersToEvalNames, context);
 		/*
 		 * Creates Array of attributes to make into the instance data
 		 */
@@ -179,6 +180,8 @@ public class Job5_Combiner extends Reducer<Text,Text,Text,Text> {
 		}
 
 	}
+	
+	
 
 	/*
 	 * Parameter: String[] of the names of the classifiers to be evaluated
@@ -186,18 +189,26 @@ public class Job5_Combiner extends Reducer<Text,Text,Text,Text> {
 	 * split in order to just use the classifier name to load the classifiers 
 	 * externally.
 	 */
-	private void loadClassifiers(String[] classifiersPar){
-
+	private void loadClassifiers(String[] classifiersPar, Context context){
+		
+		
+		Configuration conf = context.getConfiguration();
+		String outputPathStr = conf.get("modelsPath");
+		//FileSystem fs = FileSystem.get(new Path(outputPath.toString()+"Models/Mapper_"+mapperNum).toUri(), conf);
+		Path outputPath = new Path(outputPathStr+"Models/Mapper_"+combinerNum) ;
+		
+		
 		String[] splitter = null;
 		System.out.println("Reading in model for Testing...." );
 		try{
 			classifierModels = new Classifier[classifiersPar.length];
 			for(int k = 0; k < classifiersPar.length;k++){
 				splitter = classifiersPar[k].split(",");
-				classifierModels[k] = (Classifier) weka.core.SerializationHelper.read(outputPath+"Models/Mapper_"+combinerNum +"/"+splitter[0].trim()+".model");
+				classifierModels[k] = (Classifier) weka.core.SerializationHelper.read(outputPath.toUri() +"/"+splitter[0].trim()+".model");
 			}
 
 		}catch(Exception e){
+			System.out.println("ERROR: Could not read in classifier model files into Combiner: " + combinerNum);
 			e.printStackTrace();
 		}
 		System.out.println("Read in models succesfully!\n");

@@ -1,4 +1,4 @@
-import java.io.File;
+import java.io.*;
 import java.io.IOException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
@@ -23,6 +23,10 @@ import weka.core.OptionHandler;
 import weka.core.converters.ArffSaver;
 import weka.classifiers.lazy.*;
 import weka.classifiers.UpdateableClassifier;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FSDataOutputStream;
 
 
 public class Job5_Mapper extends Mapper<Text, Text, Text, Text>{
@@ -62,10 +66,10 @@ public class Job5_Mapper extends Mapper<Text, Text, Text, Text>{
 		numFolds = Integer.parseInt(conf.get("numFolds"));
 		numDocsInFold = (int)(totalDocuments/numFolds);
 		classifiersToBuildNames = conf.get("parClassifiers").split("\t");
-		
+
 		upClassifierList = new ArrayList<UpdateableClassifier>();
 		nonUpClassifierList = new ArrayList<Classifier>();
-		
+
 		indexClassifierBank();
 		initClassifiers();
 		//checks whether either array is empty
@@ -132,7 +136,7 @@ public class Job5_Mapper extends Mapper<Text, Text, Text, Text>{
 		context.getCounter(Job5_Mapper_Counter.LINES).increment(1);//increments the counter so it can be used as indexer
 		docCounter = context.getCounter(Job5_Mapper_Counter.LINES).getValue();
 
-		//	System.out.println("Mapper " + mapperNum + "\t" +docID_Class_Text.toString());
+	//	System.out.println("Mapper " + mapperNum + "\t" +docID_Class_Text.toString());
 
 		if(currentPartition != mapperNum && currentPartition < numFolds ){
 
@@ -228,12 +232,19 @@ public class Job5_Mapper extends Mapper<Text, Text, Text, Text>{
 		 */
 		System.out.println("Mapper "+ mapperNum + " | Trained "+trainedDocsCount+" | Wrote out "+mapWriteCount + " instances\n");
 
-		Configuration conf = context.getConfiguration();
-		outputPath = conf.get("modelsPath");
-		File ClassifierModelsDir = new File(outputPath+"Models/Mapper_"+mapperNum);
-		ClassifierModelsDir.mkdirs();
-
 		try{
+			Configuration conf = context.getConfiguration();
+			String outputPathStr = conf.get("modelsPath");
+			//FileSystem fs = FileSystem.get(new Path(outputPath.toString()+"Models/Mapper_"+mapperNum).toUri(), conf);
+			Path outputPath = new Path(outputPathStr+"Models/Mapper_"+mapperNum) ;
+			FileSystem fs = FileSystem.get(conf);
+			fs.mkdirs(outputPath);
+			
+			
+		//	File ClassifierModelsDir = new File(outputPath+"Models/Mapper_"+mapperNum);
+		//	ClassifierModelsDir.mkdirs();
+
+
 			for(int k = 0; k < nonUpClassifierList.size();k++){
 				System.out.println("Training classifier "+ nonUpClassifierList.get(k).getClass().getSimpleName()+ " on training fold "+ mapperNum);
 				nonUpClassifierList.get(k).buildClassifier(dataset);
@@ -242,11 +253,13 @@ public class Job5_Mapper extends Mapper<Text, Text, Text, Text>{
 			System.out.println("Writing out Classifiers...");
 			for(int k = 0; k < nonUpClassifierList.size();k++){
 				System.out.println("Writing model "+ nonUpClassifierList.get(k).getClass().getSimpleName());
-				weka.core.SerializationHelper.write(outputPath+"Models/Mapper_"+mapperNum +"/"+nonUpClassifierList.get(k).getClass().getSimpleName()+".model", nonUpClassifierList.get(k));
+				fs.create(new Path(outputPath.toString()+"/"+nonUpClassifierList.get(k).getClass().getSimpleName()+".model" ), true);
+				weka.core.SerializationHelper.write(outputPath.toUri()+"/"+nonUpClassifierList.get(k).getClass().getSimpleName()+".model", nonUpClassifierList.get(k));
+				System.out.println(outputPath.toUri());
 			}
 			for(int k = 0; k < upClassifierList.size();k++){
 				System.out.println("Writing model "+ upClassifierList.get(k).getClass().getSimpleName());
-				weka.core.SerializationHelper.write(outputPath+"Models/Mapper_"+mapperNum +"/"+upClassifierList.get(k).getClass().getSimpleName()+".model", upClassifierList.get(k));
+				weka.core.SerializationHelper.write(outputPath.toUri()+"/"+upClassifierList.get(k).getClass().getSimpleName()+".model", upClassifierList.get(k));
 			}
 
 			dataset.delete();
@@ -254,7 +267,22 @@ public class Job5_Mapper extends Mapper<Text, Text, Text, Text>{
 
 
 		}catch (Exception e){
-			e.printStackTrace();
+			Configuration conf = context.getConfiguration();
+			FileSystem fs = FileSystem.get(conf);
+			String outputPathStr = conf.get("modelsPath");
+			Path outputPath1 = new Path(outputPathStr+"/Error"+mapperNum+".txt");
+			FSDataOutputStream out = fs.create(outputPath1);
+			InputStream in = new BufferedInputStream(new FileInputStream(
+			new File(e.getMessage())));
+			byte[] b = new byte[1024];
+			int numBytes = 0;
+			while ((numBytes = in.read(b)) > 0) {
+			out.write(b, 0, numBytes);
+			}
+			// Close all the file descripters
+			in.close();
+			out.close();
+			fs.close();
 		}
 		//	System.out.println(context.getCounter(Job4_Mapper_Counter.LINES).getValue());
 	}
@@ -317,7 +345,7 @@ public class Job5_Mapper extends Mapper<Text, Text, Text, Text>{
 			if(classifierIndexMap.containsKey("LWL")){
 				lwl = new LWL();
 				if(!classifierIndexMap.get("LWL").equals(""))
-				lwl.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("LWL")));
+					lwl.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("LWL")));
 				upClassifierList.add(lwl);
 			}
 

@@ -3,6 +3,7 @@ import java.util.*;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.*;
+import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.conf.Configuration;
@@ -34,7 +35,7 @@ public class JobDriver extends Configured implements Tool {
 	static String parClassifiers = "", docClasses = "";
 	static boolean jobsSuccess = false;
 	//boolean array to control which jobs to run, for testing purposes
-	static boolean[] jobsToRun = {true,true,false,false,false};
+	static boolean[] jobsToRun = {true,true,true,true,true};
 
 
 	static Path docFreqPath = null, featureSetPath = null, classMemPath = null, outputPath = null,
@@ -90,7 +91,7 @@ public class JobDriver extends Configured implements Tool {
 
 		//Timer for the entire set of jobs
 		totalStartTime = System.currentTimeMillis();
-		
+
 		/*
 		 * Job 1 Goes through the DocFeatureSet sequence file to count the number of Documents.
 		 */
@@ -108,18 +109,20 @@ public class JobDriver extends Configured implements Tool {
 			job1.setMapperClass(DocCounterMapper.class);
 			//	job1.setCombinerClass(DocCounterCombiner.class);
 			job1.setReducerClass(DocCounterReducer.class);
-			
+
 			job1.setOutputKeyClass(Text.class);
 			job1.setOutputValueClass(IntWritable.class);
-			
+
 			SequenceFileInputFormat.addInputPath(job1, featureSetPath);
 			job1.setInputFormatClass(SequenceFileInputFormat.class);
-			
+
 			LazyOutputFormat.setOutputFormatClass(job1, TextOutputFormat.class);
 			FileOutputFormat.setOutputPath(job1, outputPath);
-			
+			System.out.println("DocCounter Job was called++");
 			jobsSuccess = job1.waitForCompletion(true);
-			
+
+			readTotalDocuments();
+
 			stopTime = System.currentTimeMillis();
 			jobTimes[0] = (stopTime-startTime);
 			System.out.println("********** Job 1 Done. Total Time (ms): " + (stopTime-startTime)+" **********");
@@ -139,7 +142,7 @@ public class JobDriver extends Configured implements Tool {
 		 */
 
 		if(jobsToRun[1] && (totalDocuments > 0)){
-			
+
 			startTime = System.currentTimeMillis();
 			//sets values needed for the job
 			conf.set("totalDocuments",""+totalDocuments);
@@ -147,11 +150,11 @@ public class JobDriver extends Configured implements Tool {
 			Job job2 = Job.getInstance(conf,"TFxIDF Computation");
 			job2.setJobName("TFxIDF Computation");
 			job2.setJarByClass(JobDriver.class);
-			
+
 			job2.setMapperClass(Job2_DocFreq_Mapper.class);
 			job2.setMapperClass(Job2_FeatureSet_Mapper.class);
-			job2.setReducerClass(TD_IDF_Reducer.class);
-			
+			job2.setReducerClass(Job2_Reducer.class);
+
 			job2.setInputFormatClass(SequenceFileInputFormat.class);
 			MultipleInputs.addInputPath(job2, docFreqPath, SequenceFileInputFormat.class, Job2_DocFreq_Mapper.class);
 			MultipleInputs.addInputPath(job2,featureSetPath, SequenceFileInputFormat.class, Job2_FeatureSet_Mapper.class);
@@ -164,17 +167,19 @@ public class JobDriver extends Configured implements Tool {
 			job2.setMapOutputValueClass(Text.class);
 
 			job2.setOutputKeyClass(Text.class);
-			job2.setOutputValueClass(DoubleWritable.class);
+			job2.setOutputValueClass(LongWritable.class);
 			//Writes a text file with all the features and their assigned indices 
 			MultipleOutputs.addNamedOutput(job2, "FeatureIndexKeyText", TextOutputFormat.class, Text.class, DoubleWritable.class);
 			MultipleOutputs.addNamedOutput(job2, "Seq",SequenceFileOutputFormat.class,Text.class, DoubleWritable.class);
 
 			FileOutputFormat.setOutputPath(job2, outputPath2);
-			FileOutputFormat.setCompressOutput(job2, true);
+			//	FileOutputFormat.setCompressOutput(job2, true);
 			//	    FileOutputFormat.setOutputCompressorClass(job2, SnappyCodec.class);
 			//	    SequenceFileOutputFormat.setOutputCompressionType(job2,CompressionType.BLOCK);
 
 			jobsSuccess = job2.waitForCompletion(true);
+			//Reads in the number of features and records counted in the last job
+			readJob2Output();
 			stopTime = System.currentTimeMillis();
 			jobTimes[1] = (stopTime-startTime);
 			System.out.println("********** Job 2 Done. Total Time (ms): " + (stopTime-startTime)+" **********");
@@ -231,13 +236,16 @@ public class JobDriver extends Configured implements Tool {
 
 			stopTime = System.currentTimeMillis();
 			jobTimes[2] = (stopTime-startTime);
+			/*
+			 * readDocumentClasses reads in the different document classes from output file into a string to pass to job 4 
+			 */
 			System.out.println("********** Job 3 Done. Total Time (ms): " + (stopTime-startTime)+" **********");
 
 		}
 
 		if(jobsToRun[3]){
 			startTime = System.currentTimeMillis();
-			System.out.println("/n/n Random Seed is "+randomSeed+"\n\n");
+			System.out.println("\nRandom Seed is "+randomSeed+"\n\n");
 			conf.setInt("randomSeed",randomSeed);
 			Job job4 = Job.getInstance(conf,"Matrix Randomizer Job");
 
@@ -274,20 +282,19 @@ public class JobDriver extends Configured implements Tool {
 			System.out.println("********** Job 4 Done. Total Time (ms): " + (stopTime-startTime)+" **********");
 
 
+
 		}
 
 
 		/*
-		 * Job 4 Alpha: Read from Sequence File and do a Cross-Validation on splits of the matrix
+		 * Job 5 Alpha: Read from Sequence File and do a Cross-Validation on splits of the matrix
 		 */
 
 		if(jobsToRun[4]){
 
-			/*
-			 * readDocumentClasses reads in the different document classes from output file into a string to pass to job 4 
-			 */
-			docClasses = readDocumentClasses();
 			startTime = System.currentTimeMillis();
+			docClasses = readDocumentClasses();
+			System.out.println("Features: " + totalFeatures + "  " + "Classes "+ docClasses);
 
 			conf.setLong("totalFeatures", totalFeatures);
 			conf.set("modelsPath", args[0]+"/TF_IDF/ClassifierModels/");
@@ -326,7 +333,7 @@ public class JobDriver extends Configured implements Tool {
 			jobsSuccess = job5.waitForCompletion(true);
 			stopTime = System.currentTimeMillis();
 			jobTimes[4] = (stopTime-startTime);
-			System.out.println("********** Job 4 Done. Total Time (ms): " + (stopTime-startTime)+" **********");
+			System.out.println("********** Job 5 Done. Total Time (ms): " + (stopTime-startTime)+" **********");
 		}
 
 
@@ -342,30 +349,20 @@ public class JobDriver extends Configured implements Tool {
 
 	public static String readDocumentClasses() throws IOException{
 		System.out.println("Reading in document Classes...");
-		BufferedReader br = new BufferedReader(new FileReader(outputPath3.toString()+"/DocumentClasses-r-00000"));
-		String line = "";
-		StringBuilder sb = null;
-		try {
-			sb = new StringBuilder();
-			line = br.readLine();
-
-			while (line != null) {
-				sb.append(line);
-				sb.append(System.lineSeparator());
-				line = br.readLine();
-				numClasses++;
-			}
-
-		} catch(Exception e) {
-			br.close();
-			System.out.println("ERROR: Could not read document classes from file: " + outputPath3.toString()+"/DocumentClasses-r-00000");
-			e.printStackTrace();
-			System.out.println("Ending Program.");
-			System.exit(-1);
+		
+		Configuration conf = new Configuration();
+		FileSystem fs = FileSystem.get(new Path(outputPath3.toString() +"/DocumentClasses-r-00000").toUri(), conf);
+		BufferedReader br =new BufferedReader(new InputStreamReader(fs.open(new Path(outputPath3.toString() +"/DocumentClasses-r-00000"))));
+		String line = "", classStr = "";
+		line=br.readLine();
+		while(line != null){
+			classStr += line.trim() + "\n";
+			numClasses++;
+			line=br.readLine();
 		}
-		br.close();
-		System.out.println("Succesfully read in document Classes...");
-		return sb.toString();
+		return classStr; 
+		
+		
 	}
 
 	public static void initPaths(String[] args)throws Exception{
@@ -382,161 +379,88 @@ public class JobDriver extends Configured implements Tool {
 		outputPath3 = new Path(args[0]+"/TF_IDF/MatrixFinalForm");///home/cloudera/Documents/TF_IDF
 		outputPath4 = new Path(args[0]+"/TF_IDF/RandomizedMatrices");///home/cloudera/Documents/TF_IDF
 		outputPath5 = new Path(args[0]+"/TF_IDF/FinalResults");///home/cloudera/Documents/TF_IDF	
-		
+
 		existingDirs = new File[1];
 		existingDirs[0] = new File(args[0] + "/TF_IDF");
-		Configuration config = new Configuration();
-		FileSystem hdfs = FileSystem.get(config);
-		hdfs.delete(outputPath5,true);
+
 	}
 
-	public static class DocCounterMapper extends Mapper<Text, Text, Text, IntWritable> { 
-		public void map(Text DocID, Text line, Context context) throws IOException, InterruptedException {
-			//	System.out.println(DocID.toString());
-			context.write(DocID, new IntWritable(1));
+
+
+	private void  readTotalDocuments()throws Exception{
+
+		Configuration conf = new Configuration();
+		FileSystem fs = FileSystem.get(new Path(outputPath.toString() + "/part-r-00000").toUri(), conf);
+		BufferedReader br=new BufferedReader(new InputStreamReader(fs.open(new Path(outputPath.toString() + "/part-r-00000"))));
+		String line;
+		line=br.readLine();
+		while (line != null){
+			if(line != "")
+				totalDocuments = Integer.parseInt(line.trim());
+			line=br.readLine();
 		}
+
 	}
-	public static class DocCounterCombiner extends Reducer<Text,IntWritable,Text,IntWritable> {
-		public void reduce(Text key, Iterable<Text> values,  Context context) throws IOException, InterruptedException {
-			int docCount = 0;
-			for(Text value: values){
-				docCount++;
-			}
-			context.write(new Text(""), new IntWritable(docCount));
+
+	private void  readJob2Output()throws Exception{
+
+		Configuration conf = new Configuration();
+		FileSystem fs = FileSystem.get(new Path(outputPath2.toString() + "/part-r-00000").toUri(), conf);
+		BufferedReader br=new BufferedReader(new InputStreamReader(fs.open(new Path(outputPath2.toString() + "/part-r-00000"))));
+		String line;
+		line=br.readLine();
+		String totalFeaturesStr = null, totalRecordsStr = null;
+		for(int k = 0;line != null; k++){
+			if(k == 1)
+				totalFeatures = (int)Double.parseDouble(line.trim());
+			if(k == 2)
+				totalRecords = (int) Double.parseDouble(line.trim());
+
+			line=br.readLine();
 		}
+
 	}
 
-	public static class DocCounterReducer extends Reducer<Text, IntWritable, Text, IntWritable> {
-		public void reduce(Text key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
-			int sum = 0;
-			for (IntWritable val : values) 
-				sum += val.get();
-			totalDocuments += sum;
-		}
-	}
-/*
- * TD IDF Reducer
- * 
- * In this reducer the inverse document frequency values from the docFreq mapper and the term frequency values 
- * from the feature Set Mapper are grouped by their feature. With the use of secondary sorting, in each feature-key
- * iterable, the IDF value will come first and the multiple TF values will come after it. 
- * The TFxIDF is then computed sequentially in each iterable loop and written out in the form of 
- * Document ID, Feature index, TFxIDF value. 
- * This writes out the first format of the matrix that is further formatted in the next job to meet classifying requiremnts.
- * 
- * Another separate file is written containing a list of the feature names and their assigned index for testing and validating data.
- *  
- */
-	public static class TD_IDF_Reducer extends Reducer<CompositeKey,Text,Text,DoubleWritable>{
-		MultipleOutputs<Text, DoubleWritable> mos;
-
-
-		public void setup(Context context) {
-			System.out.println("\n******** Processing TD_IDF_Reducer ********\n");
-			mos = new MultipleOutputs<Text,DoubleWritable>(context);
-
-		}
-
-		public void reduce(CompositeKey key, Iterable<Text> valueList, Context context)throws IOException , InterruptedException{
-			long recordCount = 0, featureCount = 0;
-			String docID = null;
-			double IDF = 0.0, TF = 0.0,TF_IDF = 0.0;
-			long featureIndex = 0;
-
-			Scanner scan = null;
-
-			//	if(key.getSymbol().equals("11")){
-
-			int count = 0;	
-			for(Text value : valueList){
-				//the first value in each list is the IDF value so it needs separate formatting.
-				if(count == 0){
-					scan = new Scanner(value.toString());
-					scan.useDelimiter("\t");
-					// The IDF_Flag string used as redundancy to makes sure the IDF value comes first
-					if(scan.next().equals("IDF_Flag")){
-						featureIndex = Long.parseLong(scan.next());
-						IDF = Double.parseDouble(scan.next());
-						//	System.out.println("IDF: "+ IDF);
-						//Keeps count of the total amount of unique features in the data set for later use
-						if(featureIndex > totalFeatures)
-							featureCount = featureIndex;
-					}
-					else{
-						System.out.println("Error in Reducer: IDF Key not found for feature: "+key.getPrimaryKey());
-						break;
-					}	
-				}
-				//The rest of the values are the Term Frequencies.
-				//They are each multiplied by the IDF to get the TFxIDF each DocID x FeatureIndex Record
-				else{
-					scan = new Scanner(value.toString());
-					scan.useDelimiter("\t");
-					docID = scan.next();
-					TF = Double.parseDouble(scan.next());
-					TF_IDF = TF * IDF;
-					//System.out.println("DocID: "+docID+" Feature: "+key.getSymbol()+" TF: "+TF+" IDF: "+IDF+" TF_IDF: "+TF_IDF);
-					//	System.out.println("DocID: "+docID+" FeatureIndex: "+featureIndex+" Feature Name: "+key.getSymbol()+" TF_IDF: "+TF_IDF);
-					mos.write("Seq",new Text(docID+"\t"+featureIndex),new DoubleWritable(TF_IDF));
-					//context.write(new Text(docID+"\t"+featureIndex),new DoubleWritable(TF_IDF));
-					recordCount++;
-				}
-				count++;
-			}
-			totalRecords += recordCount;
-			totalFeatures = featureCount;
-			mos.write("FeatureIndexKeyText",new Text(key.getPrimaryKey()+ "\t"+featureIndex),null);
-		}
-		
-		//Closes the multipleOutput object stream 
-		protected void cleanup(Context context) throws IOException, InterruptedException {
-			mos.close();
-		}
-	}
 
 	/*
 	 * Method is used to delete existing directories that can create a conflict
 	 * when Hadoop outputs new data
 	 */
 	public static void deleteDirs(File[] existingDirs) throws IOException{
-		System.out.println("Deleting Method is Called");
-		
 
-		
-		boolean filesExists = false;
-		String fileStr = "";
-		for(int k = 0; k < existingDirs.length; k++){
-			if(existingDirs[k].exists()){
-				fileStr += existingDirs[k].toString() + "\n";
-				filesExists = true;
-			}
+		Configuration conf = new Configuration(); 
+		conf.addResource(existingDirs[0].getPath());	
+		FileSystem fileSystem = FileSystem.get(conf);
+
+		String file = existingDirs[0].toString();
+		Path path = new Path(existingDirs[0].toString());
+		if (!fileSystem.exists(path)) {
+			System.out.println("File " + file + " does not exists");
+			System.out.println("Not Deleting Directories");
+			return;
 		}
-
-		if(filesExists){
-			System.out.println("These output directories already exist: " + fileStr);
+		else{
+			System.out.println("These output directories already exist: " + path.toString());
 			System.out.println("Do you want to delete them?  y/n");
 			Scanner scan = new Scanner(System.in);
 			String input = scan.nextLine();
 			if(input.equalsIgnoreCase("y")){
 				System.out.println("Deleting existing conflicting directories");
-				for(int k = 0; k < existingDirs.length; k++){
-					if(existingDirs[k].exists()){
-						delete(existingDirs[k]);
-					}
-				}
-			} else{
-				System.out.println("Not Deleting Directories");
-				//System.exit(0);
+				fileSystem.delete(new Path(file), true);
+				fileSystem.close();	
 
 			}
 			scan.close();
 		}
-
-
-
 	}
 
+
+
+
+
 	public static void delete(File file)throws IOException{
+
+
 
 		if(file.isDirectory()){
 
@@ -576,8 +500,9 @@ public class JobDriver extends Configured implements Tool {
 
 
 	public static void writeTimesToFile()throws IOException{
-		
-		PrintWriter writer = new PrintWriter(existingDirs[0].toString()+"/JobTimes.txt", "UTF-8");
+		Configuration conf = new Configuration();
+		FileSystem fs = FileSystem.get(new Path(existingDirs[0].toString()+"/JobTimes.txt").toUri(), conf);
+		PrintWriter writer = new PrintWriter(fs.create(new Path(existingDirs[0].toString()+"/JobTimes.txt")));
 		writer.println("**************************** Total Job Times ****************************");
 		for(int k = 0; k < jobTimes.length -1; k++){
 			writer.println("Job "+(k+1)+" Time: " + (jobTimes[k]/1000.00)+"s");
