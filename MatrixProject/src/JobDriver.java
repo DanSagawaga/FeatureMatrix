@@ -181,9 +181,11 @@ public class JobDriver extends Configured implements Tool {
 		}		
 
 		/*
-		 * Job 3 Takes the Matrix output of job 2 and groups together all the feature's indices to their respective DocID.
-		 * The Doc ID is followed by all its features and their TFxIDF values 
-		 * This relational format is needed to use as weka datasets in the next job
+		 * Job 3 Takes the Matrix output of Job 2 and reads from the class membership sequence file to assign each document 
+		 * their class. The Job also groups and sorts all the features and their values to each document using secondary sorting.
+		 * The Doc ID and its class is followed by all its sorted features and their TFxIDF values 
+		 * This relational, sorted, format is required to build Weka data sets to be trained on. 
+		 * 
 		 */
 		if(jobsToRun[2]){
 			startTime = System.currentTimeMillis();
@@ -412,7 +414,19 @@ public class JobDriver extends Configured implements Tool {
 			totalDocuments += sum;
 		}
 	}
-
+/*
+ * TD IDF Reducer
+ * 
+ * In this reducer the inverse document frequency values from the docFreq mapper and the term frequency values 
+ * from the feature Set Mapper are grouped by their feature. With the use of secondary sorting, in each feature-key
+ * iterable, the IDF value will come first and the multiple TF values will come after it. 
+ * The TFxIDF is then computed sequentially in each iterable loop and written out in the form of 
+ * Document ID, Feature index, TFxIDF value. 
+ * This writes out the first format of the matrix that is further formatted in the next job to meet classifying requiremnts.
+ * 
+ * Another separate file is written containing a list of the feature names and their assigned index for testing and validating data.
+ *  
+ */
 	public static class TD_IDF_Reducer extends Reducer<CompositeKey,Text,Text,DoubleWritable>{
 		MultipleOutputs<Text, DoubleWritable> mos;
 
@@ -421,10 +435,6 @@ public class JobDriver extends Configured implements Tool {
 			System.out.println("\n******** Processing TD_IDF_Reducer ********\n");
 			mos = new MultipleOutputs<Text,DoubleWritable>(context);
 
-		}
-
-		protected void cleanup(Context context) throws IOException, InterruptedException {
-			mos.close();
 		}
 
 		public void reduce(CompositeKey key, Iterable<Text> valueList, Context context)throws IOException , InterruptedException{
@@ -439,13 +449,16 @@ public class JobDriver extends Configured implements Tool {
 
 			int count = 0;	
 			for(Text value : valueList){
+				//the first value in each list is the IDF value so it needs separate formatting.
 				if(count == 0){
 					scan = new Scanner(value.toString());
 					scan.useDelimiter("\t");
+					// The IDF_Flag string used as redundancy to makes sure the IDF value comes first
 					if(scan.next().equals("IDF_Flag")){
 						featureIndex = Long.parseLong(scan.next());
 						IDF = Double.parseDouble(scan.next());
 						//	System.out.println("IDF: "+ IDF);
+						//Keeps count of the total amount of unique features in the data set for later use
 						if(featureIndex > totalFeatures)
 							featureCount = featureIndex;
 					}
@@ -454,6 +467,8 @@ public class JobDriver extends Configured implements Tool {
 						break;
 					}	
 				}
+				//The rest of the values are the Term Frequencies.
+				//They are each multiplied by the IDF to get the TFxIDF each DocID x FeatureIndex Record
 				else{
 					scan = new Scanner(value.toString());
 					scan.useDelimiter("\t");
@@ -465,17 +480,18 @@ public class JobDriver extends Configured implements Tool {
 					mos.write("Seq",new Text(docID+"\t"+featureIndex),new DoubleWritable(TF_IDF));
 					//context.write(new Text(docID+"\t"+featureIndex),new DoubleWritable(TF_IDF));
 					recordCount++;
-
 				}
 				count++;
-
 			}
 			totalRecords += recordCount;
 			totalFeatures = featureCount;
 			mos.write("FeatureIndexKeyText",new Text(key.getPrimaryKey()+ "\t"+featureIndex),null);
-
 		}
-
+		
+		//Closes the multipleOutput object stream 
+		protected void cleanup(Context context) throws IOException, InterruptedException {
+			mos.close();
+		}
 	}
 
 	/*
