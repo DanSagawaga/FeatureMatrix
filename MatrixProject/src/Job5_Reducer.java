@@ -154,8 +154,8 @@ public class Job5_Reducer extends Reducer <Text,Text,Text,Text> {
 				int classifierNameIndex = Integer.parseInt(tabSplitter[0]);
 				int foldIndex = Integer.parseInt(tabSplitter[1]);
 				double FScore = Double.parseDouble(tabSplitter[2]);
-				System.out.println("\nBest Classifier: "+classifierNames[classifierNameIndex] +" | "+ docClasses[k] + FScore);
-				context.write(new Text("Best Classifier: "+classifierNames[classifierNameIndex] + " | "+ docClasses[k] + FScore),
+				System.out.println("\nBest Classifier: "+classifierNames[classifierNameIndex] +" | "+ docClasses[k] +" | F-measure: "+ FScore);
+				context.write(new Text("Best Classifier: "+classifierNames[classifierNameIndex] + " | "+ docClasses[k] +" | F-measure: "+ FScore),
 						new Text( "\n"+findMatrixFold(classifierNameIndex, foldIndex)));
 			}
 

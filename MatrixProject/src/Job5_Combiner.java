@@ -1,4 +1,4 @@
-import java.io.File;
+import java.io.*;
 import java.io.IOException;
 import java.util.*;
 
@@ -10,6 +10,8 @@ import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
+
 
 import weka.core.Instances;
 import weka.classifiers.AggregateableEvaluation;
@@ -30,7 +32,7 @@ import weka.core.FastVector;
 public class Job5_Combiner extends Reducer<Text,Text,Text,Text> {
 
 	static String[] classifiersToEvalNames = null;
-	static String docClasses = null;
+	static String docClasses = null, outputPathStr= null;
 	static Classifier[] classifierModels = null;
 	ConfusionMatrix[] confMatrices = null;
 	static int combinerNum = 0, totalFeatures = 0, numClasses = 0;
@@ -56,7 +58,7 @@ public class Job5_Combiner extends Reducer<Text,Text,Text,Text> {
 		docClasses = conf.get("docClasses");
 		numClasses = Integer.parseInt(conf.get("numClasses"));
 		totalFeatures = Integer.parseInt(conf.get("totalFeatures"));
-
+		outputPathStr = conf.get("modelsPath");
 		classifiersToEvalNames = conf.get("parClassifiers").split("\t");
 		loadClassifiers(classifiersToEvalNames, context);
 		/*
@@ -193,18 +195,21 @@ public class Job5_Combiner extends Reducer<Text,Text,Text,Text> {
 		
 		
 		Configuration conf = context.getConfiguration();
-		String outputPathStr = conf.get("modelsPath");
-		//FileSystem fs = FileSystem.get(new Path(outputPath.toString()+"Models/Mapper_"+mapperNum).toUri(), conf);
-		Path outputPath = new Path(outputPathStr+"Models/Mapper_"+combinerNum) ;
-		
-		
+		Path outputPath = new Path(outputPathStr+"Models/Mapper_"+combinerNum) ;	
 		String[] splitter = null;
 		System.out.println("Reading in model for Testing...." );
+		
 		try{
+			FileSystem fs = FileSystem.get(conf);
+
 			classifierModels = new Classifier[classifiersPar.length];
 			for(int k = 0; k < classifiersPar.length;k++){
 				splitter = classifiersPar[k].split(",");
-				classifierModels[k] = (Classifier) weka.core.SerializationHelper.read(outputPath.toUri() +"/"+splitter[0].trim()+".model");
+
+				//fs = FileSystem.get(new Path(outputPath.toUri()+"/"+splitter[0].trim()+".model").toUri(), conf);
+				//System.out.println(outputPath.toUri() +"/"+splitter[0].trim()+".model");
+				FSDataInputStream in = fs.open(new Path(outputPath.toUri() +"/"+splitter[0].trim()+".model"));
+				classifierModels[k] = (Classifier) weka.core.SerializationHelper.read(in);//(outputPath.toUri() +"/"+splitter[0].trim()+".model");
 			}
 
 		}catch(Exception e){

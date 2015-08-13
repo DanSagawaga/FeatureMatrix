@@ -456,8 +456,6 @@ public class JobDriver extends Configured implements Tool {
 
 
 
-
-
 	public static void delete(File file)throws IOException{
 
 
@@ -502,7 +500,7 @@ public class JobDriver extends Configured implements Tool {
 	public static void writeTimesToFile()throws IOException{
 		Configuration conf = new Configuration();
 		FileSystem fs = FileSystem.get(new Path(existingDirs[0].toString()+"/JobTimes.txt").toUri(), conf);
-		PrintWriter writer = new PrintWriter(fs.create(new Path(existingDirs[0].toString()+"/JobTimes.txt")));
+		PrintWriter writer = new PrintWriter(fs.create(new Path(outputPath5+"/part-r-00000")));
 		writer.println("**************************** Total Job Times ****************************");
 		for(int k = 0; k < jobTimes.length -1; k++){
 			writer.println("Job "+(k+1)+" Time: " + (jobTimes[k]/1000.00)+"s");

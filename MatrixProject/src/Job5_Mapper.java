@@ -13,7 +13,8 @@ import weka.classifiers.rules.*;
 import weka.classifiers.trees.*;
 import weka.classifiers.functions.*;
 import weka.classifiers.rules.DecisionTable ;
-
+import weka.classifiers.meta.*;
+import weka.classifiers.pmml.consumer.*;
 
 import weka.core.Attribute;
 import weka.core.FastVector;
@@ -27,7 +28,8 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
-
+import weka.classifiers.pmml.consumer.SupportVectorMachineModel
+;
 
 public class Job5_Mapper extends Mapper<Text, Text, Text, Text>{
 
@@ -136,7 +138,7 @@ public class Job5_Mapper extends Mapper<Text, Text, Text, Text>{
 		context.getCounter(Job5_Mapper_Counter.LINES).increment(1);//increments the counter so it can be used as indexer
 		docCounter = context.getCounter(Job5_Mapper_Counter.LINES).getValue();
 
-	//	System.out.println("Mapper " + mapperNum + "\t" +docID_Class_Text.toString());
+		//	System.out.println("Mapper " + mapperNum + "\t" +docID_Class_Text.toString());
 
 		if(currentPartition != mapperNum && currentPartition < numFolds ){
 
@@ -239,10 +241,10 @@ public class Job5_Mapper extends Mapper<Text, Text, Text, Text>{
 			Path outputPath = new Path(outputPathStr+"Models/Mapper_"+mapperNum) ;
 			FileSystem fs = FileSystem.get(conf);
 			fs.mkdirs(outputPath);
-			
-			
-		//	File ClassifierModelsDir = new File(outputPath+"Models/Mapper_"+mapperNum);
-		//	ClassifierModelsDir.mkdirs();
+
+
+			//	File ClassifierModelsDir = new File(outputPath+"Models/Mapper_"+mapperNum);
+			//	ClassifierModelsDir.mkdirs();
 
 
 			for(int k = 0; k < nonUpClassifierList.size();k++){
@@ -253,13 +255,23 @@ public class Job5_Mapper extends Mapper<Text, Text, Text, Text>{
 			System.out.println("Writing out Classifiers...");
 			for(int k = 0; k < nonUpClassifierList.size();k++){
 				System.out.println("Writing model "+ nonUpClassifierList.get(k).getClass().getSimpleName());
-				fs.create(new Path(outputPath.toString()+"/"+nonUpClassifierList.get(k).getClass().getSimpleName()+".model" ), true);
-				weka.core.SerializationHelper.write(outputPath.toUri()+"/"+nonUpClassifierList.get(k).getClass().getSimpleName()+".model", nonUpClassifierList.get(k));
-				System.out.println(outputPath.toUri());
+				fs = FileSystem.get(new Path(outputPath+"/"+nonUpClassifierList.get(k).getClass().getSimpleName()+".model").toUri(), conf);
+				FSDataOutputStream out = fs.create(new Path(outputPath.toUri()+"/"+nonUpClassifierList.get(k).getClass().getSimpleName()+".model"));		
+				//	System.out.println(outputPath.toUri()+"/"+nonUpClassifierList.get(k).getClass().getSimpleName()+".model");
+				weka.core.SerializationHelper.write(out, nonUpClassifierList.get(k));
+
+				out.close();
+				//    oos.close();
+
+
 			}
 			for(int k = 0; k < upClassifierList.size();k++){
 				System.out.println("Writing model "+ upClassifierList.get(k).getClass().getSimpleName());
-				weka.core.SerializationHelper.write(outputPath.toUri()+"/"+upClassifierList.get(k).getClass().getSimpleName()+".model", upClassifierList.get(k));
+				fs = FileSystem.get(new Path(outputPath+"/"+nonUpClassifierList.get(k).getClass().getSimpleName()+".model").toUri(), conf);
+				FSDataOutputStream out = fs.create(new Path(outputPath.toUri()+"/"+upClassifierList.get(k).getClass().getSimpleName()+".model"));			
+				weka.core.SerializationHelper.write(out, upClassifierList.get(k));
+				out.close();
+
 			}
 
 			dataset.delete();
@@ -267,22 +279,7 @@ public class Job5_Mapper extends Mapper<Text, Text, Text, Text>{
 
 
 		}catch (Exception e){
-			Configuration conf = context.getConfiguration();
-			FileSystem fs = FileSystem.get(conf);
-			String outputPathStr = conf.get("modelsPath");
-			Path outputPath1 = new Path(outputPathStr+"/Error"+mapperNum+".txt");
-			FSDataOutputStream out = fs.create(outputPath1);
-			InputStream in = new BufferedInputStream(new FileInputStream(
-			new File(e.getMessage())));
-			byte[] b = new byte[1024];
-			int numBytes = 0;
-			while ((numBytes = in.read(b)) > 0) {
-			out.write(b, 0, numBytes);
-			}
-			// Close all the file descripters
-			in.close();
-			out.close();
-			fs.close();
+			e.printStackTrace();
 		}
 		//	System.out.println(context.getCounter(Job4_Mapper_Counter.LINES).getValue());
 	}
@@ -309,6 +306,14 @@ public class Job5_Mapper extends Mapper<Text, Text, Text, Text>{
 	}
 
 	public static void initClassifiers(){
+		/*
+		 * MultilayerPerceptron takes a long time
+		 * LMT  gives array index out of bounds exception
+		 * SMO gives array index out of bounds exception
+		 * AdditiveRegression can't handle binary classes
+		 * GaussianProcesses  can't handle binary classes
+		 * LinearRegression  can't handle binary classes
+		 */
 
 		J48 j48 = null;
 		PART part = null;
@@ -321,6 +326,18 @@ public class Job5_Mapper extends Mapper<Text, Text, Text, Text>{
 		ZeroR zeroR = null;
 		REPTree repTree = null;
 
+		Logistic logistic = null;
+		MultilayerPerceptron multilayerPerceptron = null;
+		RandomForest randomForest = null;
+		SMO sMO = null;
+		VotedPerceptron votedPerceptron = null;
+		AdditiveRegression additiveRegression = null;
+		AttributeSelectedClassifier attributeSelectedClassifier = null;
+		ClassificationViaRegression classificationViaRegression = null;
+		GaussianProcesses gaussianProcesses = null;
+		JRip jRip = null;
+		LinearRegression linearRegression = null;
+		LMT lMT = null;
 		//updatable Classifiers 
 		NaiveBayesMultinomialUpdateable NBUM = null;
 		NaiveBayesUpdateable NBU = null;
@@ -328,38 +345,90 @@ public class Job5_Mapper extends Mapper<Text, Text, Text, Text>{
 		KStar kStar = null;
 		LWL lwl = null;
 		SGD sGD = null;
+		HoeffdingTree hTree = null;
 		//SVM Logistic mutlilayerperception randomForest SMO votedPerceptiom 
 
 		try{
+			/*
+			 * 
+			 * Non updataeble Classifiers 
+			 * 
+			 */
 
-			if(classifierIndexMap.containsKey("NaiveBayesMultinomialUpdateable")){
-				NBUM = new NaiveBayesMultinomialUpdateable();
-				NBUM.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("NaiveBayesMultinomialUpdateable")));
-				upClassifierList.add(NBUM);
-			}
-			if(classifierIndexMap.containsKey("IBk")){
-				iBk = new IBk();
-				iBk.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("IBk")));
-				upClassifierList.add(iBk);
-			}
-			if(classifierIndexMap.containsKey("LWL")){
-				lwl = new LWL();
-				if(!classifierIndexMap.get("LWL").equals(""))
-					lwl.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("LWL")));
-				upClassifierList.add(lwl);
-			}
+			if(classifierIndexMap.containsKey("Logistic")){
+				logistic = new Logistic();
+				if(!classifierIndexMap.get("Logistic").equals(""))
+					logistic.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("Logistic")));
+				nonUpClassifierList.add(logistic);
+			}		
+			if(classifierIndexMap.containsKey("MultilayerPerceptron")){
+				multilayerPerceptron = new MultilayerPerceptron();
+				if(!classifierIndexMap.get("MultilayerPerceptron").equals(""))
+					multilayerPerceptron.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("MultilayerPerceptron")));
+				nonUpClassifierList.add(multilayerPerceptron);}
+			if(classifierIndexMap.containsKey("RandomForest")){
+				randomForest = new RandomForest();
+				if(!classifierIndexMap.get("RandomForest").equals(""))
+					randomForest.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("RandomForest")));
+				nonUpClassifierList.add(randomForest);}
+			if(classifierIndexMap.containsKey("SMO")){
+				sMO = new SMO();
+				if(!classifierIndexMap.get("SMO").equals(""))
+					sMO.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("SMO")));
+				nonUpClassifierList.add(sMO);}			
+			if(classifierIndexMap.containsKey("VotedPerceptron")){
+				votedPerceptron = new VotedPerceptron();
+				if(!classifierIndexMap.get("VotedPerceptron").equals(""))
+					votedPerceptron.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("VotedPerceptron")));
+				nonUpClassifierList.add(votedPerceptron);}			
+			if(classifierIndexMap.containsKey("AttributeSelectedClassifier")){
+				attributeSelectedClassifier = new AttributeSelectedClassifier();
+				if(!classifierIndexMap.get("AttributeSelectedClassifier").equals(""))
+					attributeSelectedClassifier.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("AttributeSelectedClassifier")));
+				nonUpClassifierList.add(attributeSelectedClassifier);}			
+			if(classifierIndexMap.containsKey("AdditiveRegression")){
+				additiveRegression = new AdditiveRegression();
+				if(!classifierIndexMap.get("AdditiveRegression").equals(""))
+					additiveRegression.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("AdditiveRegression")));
+				nonUpClassifierList.add(additiveRegression);}			
+			if(classifierIndexMap.containsKey("ClassificationViaRegression")){
+				classificationViaRegression = new ClassificationViaRegression();
+				if(!classifierIndexMap.get("ClassificationViaRegression").equals(""))
+					classificationViaRegression.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("ClassificationViaRegression")));
+				nonUpClassifierList.add(classificationViaRegression);}	
+			
+			if(classifierIndexMap.containsKey("GaussianProcesses")){
+				gaussianProcesses = new GaussianProcesses();
+				if(!classifierIndexMap.get("GaussianProcesses").equals(""))
+					gaussianProcesses.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("GaussianProcesses")));
+				nonUpClassifierList.add(gaussianProcesses);}
+			if(classifierIndexMap.containsKey("JRip")){
+				jRip = new JRip();
+				if(!classifierIndexMap.get("JRip").equals(""))
+					jRip.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("JRip")));
+				nonUpClassifierList.add(jRip);}
+			if(classifierIndexMap.containsKey("LinearRegression")){
+				linearRegression = new LinearRegression();
+				if(!classifierIndexMap.get("LinearRegression").equals(""))
+					linearRegression.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("LinearRegression")));
+				nonUpClassifierList.add(linearRegression);}
 
-
-
+			if(classifierIndexMap.containsKey("LMT")){
+				lMT = new LMT();
+				if(!classifierIndexMap.get("LMT").equals(""))
+					lMT.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("LMT")));
+				nonUpClassifierList.add(lMT);}
 
 			if(classifierIndexMap.containsKey("J48")){
 				j48 = new J48();
-				j48.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("J48")));
+				if(!classifierIndexMap.get("J48").equals(""))
+					j48.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("J48")));
 				nonUpClassifierList.add(j48);
 			}
 			if(classifierIndexMap.containsKey("PART")){
 				part = new PART();
-				part.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("PART")));
+				if(!classifierIndexMap.get("PART").equals(""))
+					part.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("PART")));
 				nonUpClassifierList.add(part);
 			}
 			if(classifierIndexMap.containsKey("DecisionTable")){
@@ -370,51 +439,95 @@ public class Job5_Mapper extends Mapper<Text, Text, Text, Text>{
 			}
 			if(classifierIndexMap.containsKey("DecisionStump")){
 				decisionStump = new DecisionStump();
-				decisionStump.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("DecisionStump")));
+				if(!classifierIndexMap.get("DecisionStump").equals(""))
+					decisionStump.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("DecisionStump")));
 				nonUpClassifierList.add(decisionStump);
 			}
 			if(classifierIndexMap.containsKey("NaiveBayes")){
 				naiveBayes = new NaiveBayes();
-				naiveBayes.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("NaiveBayes")));
+				if(!classifierIndexMap.get("NaiveBayes").equals(""))
+					naiveBayes.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("NaiveBayes")));
 				nonUpClassifierList.add(naiveBayes);
 			}
 			if(classifierIndexMap.containsKey("BayesNet")){
 				bayesNet = new BayesNet();
-				bayesNet.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("BayesNet")));
+				if(!classifierIndexMap.get("BayesNet").equals(""))
+					bayesNet.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("BayesNet")));
 				nonUpClassifierList.add(bayesNet);
 			}
 			if(classifierIndexMap.containsKey("NaiveBayesMultinomial")){
 				naiveBayesMultinomial = new NaiveBayesMultinomial();
-				naiveBayesMultinomial.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("NaiveBayesMultinomial")));
+				if(!classifierIndexMap.get("NaiveBayesMultinomial").equals(""))
+					naiveBayesMultinomial.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("NaiveBayesMultinomial")));
 				nonUpClassifierList.add( naiveBayesMultinomial);
 			}
 			if(classifierIndexMap.containsKey("OneR")){
 				oneR = new OneR();
-				oneR.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("OneR")));
+				if(!classifierIndexMap.get("OneR").equals(""))
+					oneR.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("OneR")));
 				nonUpClassifierList.add(oneR);
 			}
-			if(classifierIndexMap.containsKey("KStar")){
-				kStar = new KStar();
-				kStar.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("KStar")));
-				nonUpClassifierList.add(kStar);
-			}
+
 			if(classifierIndexMap.containsKey("ZeroR")){
 				zeroR = new ZeroR();
-				zeroR.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("ZeroR")));
+				if(!classifierIndexMap.get("ZeroR").equals(""))
+					zeroR.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("ZeroR")));
 				nonUpClassifierList.add(zeroR);
 			}
 			if(classifierIndexMap.containsKey("REPTree")){
 				repTree = new REPTree();
-				repTree.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("REPTree")));
+				if(!classifierIndexMap.get("REPTree").equals(""))
+					repTree.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("REPTree")));
 				nonUpClassifierList.add(repTree);
 			}
 
-			if(classifierIndexMap.containsKey("REPTree")){
-				repTree = new REPTree();
-				repTree.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("REPTree")));
-				nonUpClassifierList.add(repTree);
+			/*
+			 * 
+			 * Updateable Classifiers 
+			 * 
+			 */
+			if(classifierIndexMap.containsKey("NaiveBayesMultinomialUpdateable")){
+				NBUM = new NaiveBayesMultinomialUpdateable();
+				if(!classifierIndexMap.get("NaiveBayesMultinomialUpdateable").equals(""))
+					NBUM.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("NaiveBayesMultinomialUpdateable")));
+				upClassifierList.add(NBUM);
 			}
-
+			if(classifierIndexMap.containsKey("NaiveBayesUpdateable")){
+				NBU = new NaiveBayesUpdateable();
+				if(!classifierIndexMap.get("NaiveBayesUpdateable").equals(""))
+					NBU.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("NaiveBayesUpdateable")));
+				upClassifierList.add(NBU);
+			}
+			if(classifierIndexMap.containsKey("IBk")){
+				iBk = new IBk();
+				if(!classifierIndexMap.get("IBk").equals(""))
+					iBk.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("IBk")));
+				upClassifierList.add(iBk);
+			}
+			if(classifierIndexMap.containsKey("LWL")){
+				lwl = new LWL();
+				if(!classifierIndexMap.get("LWL").equals(""))
+					lwl.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("LWL")));
+				upClassifierList.add(lwl);
+			}
+			if(classifierIndexMap.containsKey("KStar")){
+				kStar = new KStar();
+				if(!classifierIndexMap.get("KStar").equals(""))
+					kStar.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("KStar")));
+				upClassifierList.add(kStar);
+			}
+			if(classifierIndexMap.containsKey("SGD")){
+				sGD = new SGD();
+				if(!classifierIndexMap.get("SGD").equals(""))
+					sGD.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("SGD")));
+				upClassifierList.add(sGD);
+			}
+			if(classifierIndexMap.containsKey("HoeffdingTree")){
+				hTree = new HoeffdingTree();
+				if(!classifierIndexMap.get("HoeffdingTree").equals(""))
+					hTree.setOptions(weka.core.Utils.splitOptions(classifierIndexMap.get("HoeffdingTree")));
+				upClassifierList.add(hTree);
+			}
 
 		}catch(Exception e){
 			e.printStackTrace();
