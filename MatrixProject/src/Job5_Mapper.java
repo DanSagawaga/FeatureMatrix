@@ -14,23 +14,30 @@ import weka.classifiers.trees.*;
 import weka.classifiers.functions.*;
 import weka.classifiers.rules.DecisionTable ;
 import weka.classifiers.meta.*;
-import weka.classifiers.pmml.consumer.*;
 
 import weka.core.Attribute;
 import weka.core.FastVector;
 import weka.core.Instances;
 import weka.core.SparseInstance;
-import weka.core.OptionHandler;
-import weka.core.converters.ArffSaver;
 import weka.classifiers.lazy.*;
 import weka.classifiers.UpdateableClassifier;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
-import weka.classifiers.pmml.consumer.SupportVectorMachineModel
-;
-
+/*
+ * Job 5 Mapper
+ * 
+ * This is replicated n (number of Folds) to work in parallel. Each Mapper reads in the final formatted matrix to to create a different training set. 
+ * Ex. Mapper 0 will create a training set on all folds except 0 and write only 0 out to the combiner.
+ * 
+ * In the setup mmethod, relevant primitive variables are initialiazed, and then 
+ * 
+ * In the set up process the Weka Data is initialized in ARFF format. A List of numeric attributes, 0 to (# of features) is initialized, each attribute corresponding to a feature Index.
+ * Then a separate nominal list of class attributes is created and added to the attribute array as the last index.
+ * 
+ * 
+ * 
+ */
 public class Job5_Mapper extends Mapper<Text, Text, Text, Text>{
 
 	enum Job5_Mapper_Counter { LINES }

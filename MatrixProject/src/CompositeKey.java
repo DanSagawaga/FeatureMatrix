@@ -5,7 +5,12 @@ import java.io.IOException;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.io.WritableUtils;
 
-
+/*
+ * Compositekey
+ * 
+ * Custom Writable Class that supports two keys in order to be able to perform secondary sorting
+ * 
+ */
 public class CompositeKey implements WritableComparable<CompositeKey> {
 
 	private String primaryKey;

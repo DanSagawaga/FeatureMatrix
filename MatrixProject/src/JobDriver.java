@@ -3,15 +3,12 @@ import java.util.*;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.*;
-import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.mapreduce.lib.input.MultipleInputs;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
-import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.output.LazyOutputFormat; 
 import org.apache.hadoop.mapreduce.lib.output.MultipleOutputs;
 import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
@@ -20,16 +17,45 @@ import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
-
-
 //import org.apache.hadoop.io.compress.CompressionCodec;
 //import org.apache.hadoop.io.compress.CompressionCodecFactory;
 
 
+
+/*
+ * 		JobDriver.java 
+ * 
+ * 		Author: Dan Saganome
+ * 		August 14, 2015 
+ * 
+ * 		Summary: This program was created with the purpose of creating a machine learning classifier ensemble trained on sets of pre-proccessed 
+ * 		data taken from a set of Documents on MapReduce. The program takes a set of sequence files containing a feature list of a set of documents, 
+ * 		as well as the feature frequency within each document and collectively across all documents in order to build a Term Frequency x Inverse Document Frequency 
+ * 		sparse-matrix. The matrix is then used to cross-validate a set of classifiers in parallel. The classifier with the best F Measure to each class is written 
+ * 		out into a text file with an xml confusion matrix. 
+ * 
+ * 		Future Work: 
+ * 			All Jobs: Use compressed sequence files to reduce the footprint of the program (snappy seems like a good candidate because of its minimal trade-offs)
+ * 			Job 5:    Implement a custom writable class that can support serializing objects so the classifier model objects do not have be written and read from HDFS
+ * 
+ * 		List of Supported Classifiers
+ * 		J48 PART DecisionTable DecisionStump NaiveBayes BayesNet NaiveBayesMultinomial OneR ZeroR REPTree LogisticMultilayerPerceptron RandomForestSMO VotedPerceptron 
+ * 		AdditiveRegression AttributeSelectedClassifier SGD HoeffdingTree**
+ * 
+ *       **
+ *		  AdditiveRegression can't handle binary classes
+ *		  GaussianProcesses  can't handle binary classes
+ *		  LinearRegression  can't handle binary classes
+ *		  MultilayerPerceptron stalls extendedly
+ *		  LMT  gives array index out of bounds exception
+ *		  SMO gives array index out of bounds exception
+ * 
+ */
+
 public class JobDriver extends Configured implements Tool {
 
 	static int instanceSize = 0, numFolds = 0, numClasses = 0, numClassifiers = 0, randomSeed = 0;
-	static float[] jobTimes = new float[6];
+	static float[] jobTimes = new float[6];//array to store the different job times
 	static long totalDocuments = 0, totalRecords = 0, totalFeatures = 0, startTime = 0, stopTime = 0, totalStartTime = 0, totalStopTime = 0;
 
 	static String parClassifiers = "", docClasses = "";
@@ -37,17 +63,15 @@ public class JobDriver extends Configured implements Tool {
 	//boolean array to control which jobs to run, for testing purposes
 	static boolean[] jobsToRun = {true,true,true,true,true};
 
-
 	static Path docFreqPath = null, featureSetPath = null, classMemPath = null, outputPath = null,
 			outputPath2 = null,outputPath3 = null,outputPath4 = null, outputPath5 = null;
 	static File existingDirs[] = null;
 
 	/*
 	 * The Main method initializes the main parameters and calls toolRunner to run the jobs
+	 * Checks the parameters
 	 */
 	public static void main(String[] args) {
-
-		System.out.println("The Main Method was Called\n");
 		try{
 			numFolds = Integer.parseInt(args[1]);
 			randomSeed = Integer.parseInt(args[2]);
@@ -67,10 +91,12 @@ public class JobDriver extends Configured implements Tool {
 			 * Instantiates all the output and Input directories needed
 			 */
 			initPaths(args);
+
 			//Recursively deletes any existing output directories that will cause a conflict
 			deleteDirs(existingDirs);
 
-			ToolRunner.run(new Configuration(), new JobDriver(), args);
+			ToolRunner.run(new Configuration(), new JobDriver(), args);//runs the jobs
+
 			System.out.println("Number of Documents: "+totalDocuments
 					+"\nNumber of Features: "+totalFeatures
 					+"\nNumber of Records: "+totalRecords
@@ -93,7 +119,10 @@ public class JobDriver extends Configured implements Tool {
 		totalStartTime = System.currentTimeMillis();
 
 		/*
+		 * Job 1 Document Counter 
+		 * 
 		 * Job 1 Goes through the DocFeatureSet sequence file to count the number of Documents.
+		 * This number is needed to compute the TFxIDF values in the next Job 
 		 */
 		Configuration conf = new Configuration();
 
@@ -129,9 +158,11 @@ public class JobDriver extends Configured implements Tool {
 
 		}
 		/*
-		 *  Job 2 reads the DocFreq sequence file and the FeatureSetWeighted sequence file.
-		 * 	DocFreqMapper computes the Inverse document frequency for each feature.
-		 *	FeatureSetWeightedMapper computes the Term frequency 
+		 * 	Job 2 TFxIDF Matrix Prototype  
+		 * 
+		 * Job 2 reads the DocFreq sequence file and the FeatureSetWeighted sequence file.
+		 * DocFreqMapper computes the Inverse document frequency for each feature.
+		 * FeatureSetWeightedMapper computes the Term frequency 
 		 *
 		 * Both Mappers pass each feature as a key to the reducer and the relevant data as the value
 		 * The Reducer computes the Term Frequency x Inverse Document Frequency. 
@@ -186,6 +217,8 @@ public class JobDriver extends Configured implements Tool {
 		}		
 
 		/*
+		 * Job 3 Final Matrix Formatting
+		 * 
 		 * Job 3 Takes the Matrix output of Job 2 and reads from the class membership sequence file to assign each document 
 		 * their class. The Job also groups and sorts all the features and their values to each document using secondary sorting.
 		 * The Doc ID and its class is followed by all its sorted features and their TFxIDF values 
@@ -242,6 +275,15 @@ public class JobDriver extends Configured implements Tool {
 			System.out.println("********** Job 3 Done. Total Time (ms): " + (stopTime-startTime)+" **********");
 
 		}
+		/*
+		 * Job 4 Matrix Data Randomizer 
+		 * 
+		 * Job 4 simply randomizes the matrix according to the inputted random seed number.
+		 * The reducer makes n (fold number) identical copies of the matrix to be read by n number of mappers in the next job
+		 * 
+		 * **Future Work** A useful feature that can be added to this job is to also stratify the matrix in order have 
+		 * ** the ability to have stratified cross validation.
+		 */
 
 		if(jobsToRun[3]){
 			startTime = System.currentTimeMillis();
@@ -265,7 +307,9 @@ public class JobDriver extends Configured implements Tool {
 			job4.setOutputKeyClass(Text.class);
 			job4.setOutputValueClass(Text.class);
 			job4.setOutputFormatClass(SequenceFileOutputFormat.class);
-
+			/*
+			 * Creates n (number of folds) copies of the matrix to be read by the next job
+			 */
 			for(int k = 0; k < numFolds; k++)
 				MultipleOutputs.addNamedOutput(job4, "Matrix"+k, SequenceFileOutputFormat.class, Text.class, Text.class);
 
@@ -276,18 +320,27 @@ public class JobDriver extends Configured implements Tool {
 			//  SequenceFileOutputFormat.setOutputCompressionType(job3,CompressionType.BLOCK);
 
 			jobsSuccess = job4.waitForCompletion(true);
-
 			stopTime = System.currentTimeMillis();
 			jobTimes[3] = (stopTime-startTime);
 			System.out.println("********** Job 4 Done. Total Time (ms): " + (stopTime-startTime)+" **********");
-
-
-
 		}
 
-
 		/*
-		 * Job 5 Alpha: Read from Sequence File and do a Cross-Validation on splits of the matrix
+		 * Job 5 Parallel Cross-Validation Training/Testing 
+		 * 
+		 * Job 5 performs a cross validation of every classifier in parallel and picks the classifier that achieved the highest F Score
+		 * Job 5 has n (number of Folds) mappers that each read a copy of the matrix. Each mapper trains each classifier on a different
+		 * permutation of the matrix and write out to its combiner the fold that it did not train on, ie. the test dataset.
+		 * For example, mapper 0 will train on all folds except for 0 and write out fold 0 to its combiner, mapper 1 will train on all 
+		 * folds except for fold 1 and write fold 1 to its combiner for testing...
+		 * Once a mapper is done training, it writes it's trained classifier models to HDFS in a directory named after its number (mapper_0)
+		 * Once the Combiner starts, it first reads in the classifier models from HDFS and initializes them into an array of classifiers.
+		 * The classifiers are then validated on the test fold taken from the its mapper and all the relevant result information such as all
+		 * the F measures of each class and the confusion matrices are passes as a string to the reducer. 
+		 * In the reducer the classifiers are grouped by their name in which a comparison of their F measures is stored and compared to in ordered to select
+		 * which classifier achieved the highest F measure for each class. That information is then written to a text file which listing which classifiers where 
+		 * the best in classifying each class, what training fold it trained on, and the confusion matrix from the test fold.
+		 * 
 		 */
 
 		if(jobsToRun[4]){
@@ -349,7 +402,7 @@ public class JobDriver extends Configured implements Tool {
 
 	public static String readDocumentClasses() throws IOException{
 		System.out.println("Reading in document Classes...");
-		
+
 		Configuration conf = new Configuration();
 		FileSystem fs = FileSystem.get(new Path(outputPath3.toString() +"/DocumentClasses-r-00000").toUri(), conf);
 		BufferedReader br =new BufferedReader(new InputStreamReader(fs.open(new Path(outputPath3.toString() +"/DocumentClasses-r-00000"))));
@@ -361,34 +414,38 @@ public class JobDriver extends Configured implements Tool {
 			line=br.readLine();
 		}
 		return classStr; 
-		
-		
-	}
 
+
+	}
+	/*
+	 * Initializes all the paths used by the jobs. Since there are multiple outputs, the output path are hard coded to be relative to 
+	 * the path inputed by the user.
+	 */
 	public static void initPaths(String[] args)throws Exception{
 
+		//makes the parent directory for all the outputs
 		File ClassifierModelsDir = new File(args[0]+"/TF_IDF");
 		if(!ClassifierModelsDir.exists())
 			ClassifierModelsDir.mkdirs();
 
-		docFreqPath = new Path(args[0]+"/feature-sets/ne_all/docfreqs/part-00000");//home/cloudera/Desktop/2-100/feature-sets/ne_all/docfreqs/part-00000			
-		featureSetPath = new Path(args[0]+"/feature-sets/ne_all/docfeaturesets-weighted/part-00000");//home/cloudera/Desktop/2-100/feature-sets/ne_all/docfeaturesets-weighted/part-00000
+		docFreqPath = new Path(args[0]+"/feature-sets/ne_all/docfreqs/part-00000");		
+		featureSetPath = new Path(args[0]+"/feature-sets/ne_all/docfeaturesets-weighted/part-00000");
 		classMemPath = new Path(args[0]+"/class-memberships/class-memberships.seq");
-		outputPath = new Path(args[0]+"/TF_IDF/DocumentCounter");///home/cloudera/Documents/TF_IDF
-		outputPath2 = new Path(args[0]+"/TF_IDF/MatrixIntermediateFormat");// /home/cloudera/Documents/TF_IDF
-		outputPath3 = new Path(args[0]+"/TF_IDF/MatrixFinalForm");///home/cloudera/Documents/TF_IDF
-		outputPath4 = new Path(args[0]+"/TF_IDF/RandomizedMatrices");///home/cloudera/Documents/TF_IDF
-		outputPath5 = new Path(args[0]+"/TF_IDF/FinalResults");///home/cloudera/Documents/TF_IDF	
-
+		outputPath = new Path(args[0]+"/TF_IDF/DocumentCounter");
+		outputPath2 = new Path(args[0]+"/TF_IDF/MatrixIntermediateFormat");
+		outputPath3 = new Path(args[0]+"/TF_IDF/MatrixFinalForm");
+		outputPath4 = new Path(args[0]+"/TF_IDF/RandomizedMatrices");
+		outputPath5 = new Path(args[0]+"/TF_IDF/FinalResults");			
+		/*
+		 * Path to check if this directory exists on the start of the program.
+		 * If it exists then the main method calls the deleteDirs method to recursively
+		 * delete the directory to prevent conflicts.
+		 */
 		existingDirs = new File[1];
 		existingDirs[0] = new File(args[0] + "/TF_IDF");
-
 	}
 
-
-
 	private void  readTotalDocuments()throws Exception{
-
 		Configuration conf = new Configuration();
 		FileSystem fs = FileSystem.get(new Path(outputPath.toString() + "/part-r-00000").toUri(), conf);
 		BufferedReader br=new BufferedReader(new InputStreamReader(fs.open(new Path(outputPath.toString() + "/part-r-00000"))));
@@ -401,15 +458,15 @@ public class JobDriver extends Configured implements Tool {
 		}
 
 	}
-
+	/*
+	 * Reads in the number of Features, and Records for future user
+	 */
 	private void  readJob2Output()throws Exception{
-
 		Configuration conf = new Configuration();
 		FileSystem fs = FileSystem.get(new Path(outputPath2.toString() + "/part-r-00000").toUri(), conf);
 		BufferedReader br=new BufferedReader(new InputStreamReader(fs.open(new Path(outputPath2.toString() + "/part-r-00000"))));
 		String line;
 		line=br.readLine();
-		String totalFeaturesStr = null, totalRecordsStr = null;
 		for(int k = 0;line != null; k++){
 			if(k == 1)
 				totalFeatures = (int)Double.parseDouble(line.trim());
@@ -420,7 +477,6 @@ public class JobDriver extends Configured implements Tool {
 		}
 
 	}
-
 
 	/*
 	 * Method is used to delete existing directories that can create a conflict
@@ -456,51 +512,13 @@ public class JobDriver extends Configured implements Tool {
 
 
 
-	public static void delete(File file)throws IOException{
-
-
-
-		if(file.isDirectory()){
-
-			//directory is empty, then delete it
-			if(file.list().length==0){
-
-				file.delete();
-				//			System.out.println("Directory is deleted : " + file.getAbsolutePath());
-
-			}else{
-
-				//list all the directory contents
-				String files[] = file.list();
-
-				for (String temp : files) {
-					//construct the file structure
-					File fileDelete = new File(file, temp);
-
-					//recursive delete
-					delete(fileDelete);
-				}
-
-				//check the directory again, if empty then delete it
-				if(file.list().length==0){
-					file.delete();
-					System.out.println("Directory is deleted : " 
-							+ file.getAbsolutePath());
-				}
-			}
-
-		}else{
-			//if file, then delete it
-			file.delete();
-			//	System.out.println("File is deleted : " + file.getAbsolutePath());
-		}
-	}
-
-
+	/*
+	 * Writes the final times of the jobs to a file in the Final Result Directory 
+	 */
 	public static void writeTimesToFile()throws IOException{
 		Configuration conf = new Configuration();
-		FileSystem fs = FileSystem.get(new Path(existingDirs[0].toString()+"/JobTimes.txt").toUri(), conf);
-		PrintWriter writer = new PrintWriter(fs.create(new Path(outputPath5+"/part-r-00000")));
+		FileSystem fs = FileSystem.get(new Path(outputPath5.toString()+"/JobTimes.txt").toUri(), conf);
+		PrintWriter writer = new PrintWriter(fs.create(new Path(outputPath5+"/JobTimes.txt")));
 		writer.println("**************************** Total Job Times ****************************");
 		for(int k = 0; k < jobTimes.length -1; k++){
 			writer.println("Job "+(k+1)+" Time: " + (jobTimes[k]/1000.00)+"s");
